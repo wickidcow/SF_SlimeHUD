@@ -1,4 +1,4 @@
-name: SF_SlimeHUD
+name: SlimeHUD
 version: ${project.version}
 main: io.github.schntgaispock.slimehud.SlimeHUD
 api-version: '1.21'
