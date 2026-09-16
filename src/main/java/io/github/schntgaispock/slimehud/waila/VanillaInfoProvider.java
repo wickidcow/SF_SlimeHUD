@@ -23,7 +23,6 @@ import org.bukkit.block.data.type.Beehive;
 import org.bukkit.block.data.type.Farmland;
 import org.bukkit.block.data.type.NoteBlock;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 
@@ -35,7 +34,7 @@ public final class VanillaInfoProvider {
         return humanize(block.getType().name());
     }
 
-    public static String getInfo(Block block, Player player, FileConfiguration config) {
+    public static String getInfo(Block block, ItemStack heldItem, FileConfiguration config) {
         List<String> parts = new ArrayList<>();
         BlockData data = block.getBlockData();
 
@@ -133,9 +132,8 @@ public final class VanillaInfoProvider {
         if (config.getBoolean("vanilla.show-tool", true)) {
             String tool = preferredTool(block.getType());
             if (!tool.isEmpty()) {
-                ItemStack held = player.getInventory().getItemInMainHand();
-                if (held != null && !held.getType().isAir()) {
-                    tool += block.isPreferredTool(held) ? " (held ✓)" : " (held ✗)";
+                if (heldItem != null && !heldItem.getType().isAir()) {
+                    tool += block.isPreferredTool(heldItem) ? " (held ✓)" : " (held ✗)";
                 }
                 parts.add("Tool: " + tool);
             }
