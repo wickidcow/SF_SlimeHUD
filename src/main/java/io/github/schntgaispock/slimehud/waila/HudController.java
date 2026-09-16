@@ -16,11 +16,9 @@ import io.github.thebusybiscuit.slimefun4.implementation.items.cargo.CargoManage
 import io.github.thebusybiscuit.slimefun4.implementation.items.cargo.CargoNode;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyConnector;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyRegulator;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 
 public final class HudController {
@@ -144,20 +142,7 @@ public final class HudController {
     }
 
     private int getNetworkSize(Network network) {
-        if (network == null) {
-            return -1;
-        }
-        try {
-            Field connectorNodes = Network.class.getDeclaredField("connectorNodes");
-            Field terminusNodes = Network.class.getDeclaredField("terminusNodes");
-            connectorNodes.setAccessible(true);
-            terminusNodes.setAccessible(true);
-            int connectorCount = ((Set<?>) connectorNodes.get(network)).size();
-            int terminusCount = ((Set<?>) terminusNodes.get(network)).size();
-            return connectorCount + terminusCount + 1;
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return -1;
-        }
+        return network == null ? -1 : network.getSize();
     }
 
     private Function<HudRequest, String> tryGetHandler(SlimefunItem item) {
