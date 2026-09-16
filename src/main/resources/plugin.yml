@@ -1,31 +1,27 @@
 name: SlimeHUD
-
-author: SchnTgaiSpock
-
-description: A utility addon that adds a toggleable WAILA (What Am I Looking At) HUD for placed Slimefun items.
-
-main: io.github.schntgaispock.slimehud.SlimeHUD
-
-website: https://github.com/SchnTgaiSpock/SlimeHUD
-
 version: ${project.version}
-
-api-version: 1.14
+main: io.github.schntgaispock.slimehud.SlimeHUD
+api-version: '1.21'
+folia-supported: true
+author: wickidcow
+description: Slimefun Legacy and vanilla WAILA-style HUD with per-player BossBar or ActionBar display.
+website: https://github.com/wickidcow/SF_SlimeHUD
 
 depend:
-- Slimefun
-
+  - Slimefun
 softdepend:
-- PlaceholderAPI
-- SlimefunTranslation
+  - PlaceholderAPI
 
 commands:
   slimehud:
-    description: /slimehud
+    description: Toggle and configure the SF_SlimeHUD display.
     aliases: [sfhud, sfh]
-    usage: Press [tab] for usage hints
+    usage: /slimehud <toggle|display|status>
 
 permissions:
-  slimehud.togglewaila:
-    description: Able to toggle the WAILA HUD
+  slimehud.toggle:
+    description: Toggle the HUD on or off.
+    default: true
+  slimehud.display:
+    description: Choose BossBar or ActionBar display mode.
     default: true

@@ -1,30 +1,27 @@
 package io.github.schntgaispock.slimehud.placeholder;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
+import io.github.schntgaispock.slimehud.waila.HudPreferences;
 import io.github.schntgaispock.slimehud.waila.PlayerWAILA;
 import io.github.schntgaispock.slimehud.waila.WAILAManager;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.entity.Player;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-public class PlaceholderHook extends PlaceholderExpansion {
-    private final WAILAManager wailaManager = WAILAManager.getInstance();
+public final class PlaceholderHook extends PlaceholderExpansion {
 
     @Override
-    public @Nonnull String getIdentifier() {
+    public String getIdentifier() {
         return "slimehud";
     }
 
     @Override
-    public @Nonnull String getAuthor() {
-        return "TheLittle_Yang";
+    public String getAuthor() {
+        return "wickidcow";
     }
 
     @Override
-    public @Nonnull String getVersion() {
-        return "1.0.0";
+    public String getVersion() {
+        return SlimeHUD.getInstance().getDescription().getVersion();
     }
 
     @Override
@@ -33,25 +30,26 @@ public class PlaceholderHook extends PlaceholderExpansion {
     }
 
     @Override
-    public @Nullable String onPlaceholderRequest(Player player, @Nonnull String params) {
-        if (params.equalsIgnoreCase("toggle")) {
-            return SlimeHUD.getInstance().getPlayerData().getString(player.getUniqueId() + ".waila", "true");
-        } else if (params.startsWith("hud")) {
-            String[] split = params.split("_");
-            PlayerWAILA playerWAILA = wailaManager.getWailas().get(player.getUniqueId());
-            switch (split.length) {
-                case 1 -> {
-                    return playerWAILA.getFacing();
-                }
-                case 2 -> {
-                    return playerWAILA.getFacingBlock();
-                }
-                case 3 -> {
-                    return playerWAILA.getFacingBlockInfo();
-                }
-            }
+    public String onPlaceholderRequest(Player player, String params) {
+        if (player == null) {
+            return "";
+        }
+        if (params.equalsIgnoreCase("toggle") || params.equalsIgnoreCase("enabled")) {
+            return Boolean.toString(HudPreferences.isEnabled(player));
+        }
+        if (params.equalsIgnoreCase("display")) {
+            return HudPreferences.getDisplayMode(player).configName();
         }
 
-        return null;
+        PlayerWAILA hud = WAILAManager.getInstance().getWailas().get(player.getUniqueId());
+        if (hud == null) {
+            return "";
+        }
+        return switch (params.toLowerCase()) {
+            case "hud" -> hud.getFacing();
+            case "hud_block" -> hud.getFacingBlock();
+            case "hud_block_info" -> hud.getFacingBlockInfo();
+            default -> null;
+        };
     }
 }

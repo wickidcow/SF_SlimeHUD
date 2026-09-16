@@ -1,76 +1,51 @@
 package io.github.schntgaispock.slimehud;
 
-
-import javax.annotation.Nonnull;
-
+import io.github.schntgaispock.slimehud.command.CommandManager;
 import io.github.schntgaispock.slimehud.placeholder.PlaceholderManager;
 import io.github.schntgaispock.slimehud.translation.TranslationManager;
 import io.github.schntgaispock.slimehud.waila.HudController;
+import io.github.schntgaispock.slimehud.waila.WAILAManager;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import org.bukkit.NamespacedKey;
+import org.bukkit.plugin.java.JavaPlugin;
 
-import io.github.mooy1.infinitylib.core.AbstractAddon;
-import io.github.mooy1.infinitylib.core.AddonConfig;
-import io.github.schntgaispock.slimehud.command.CommandManager;
-import io.github.schntgaispock.slimehud.waila.WAILAManager;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.updater.BlobBuildUpdater;
-import lombok.Getter;
+public final class SlimeHUD extends JavaPlugin {
 
-public class SlimeHUD extends AbstractAddon {
-
-    @Getter AddonConfig playerData;
-    static @Getter SlimeHUD instance;
+    private static SlimeHUD instance;
     private HudController hudController;
     private TranslationManager translationManager;
 
-    public SlimeHUD() {
-        super("SchnTgaiSpock", "SlimeHUD", "master", "options.auto-update");
-    }
-
-
     @Override
-    public void enable() {
+    public void onEnable() {
         instance = this;
+        saveDefaultConfig();
 
-        getLogger().info("#=================================#");
-        getLogger().info("#    SlimeHUD by SchnTgaiSpock    #");
-        getLogger().info("#=================================#");
+        getLogger().info("===================================");
+        getLogger().info(" SF_SlimeHUD " + getDescription().getVersion());
+        getLogger().info(" Slimefun Legacy + vanilla HUD");
+        getLogger().info("===================================");
 
-        if (getConfig().getBoolean("options.auto-update")) {
-            if (getDescription().getVersion().startsWith("Dev - ")) {
-                new BlobBuildUpdater(this, getFile(), "SlimeHUD", "Dev").start();
-            } else {
-                getLogger().info("This is an unofficial build of SlimeHUD, so auto updates are disabled!");
-                getLogger().info("You can download the official build here: https://blob.build/project/SlimeHUD");
-            }
-        }
-
-        final Metrics metrics = new Metrics(this, 15883);
-        metrics.addCustomChart(
-            new SimplePie("disabled", () -> {
-                return "" + getConfig().getBoolean("waila.disabled");
-            })
-        );
-        metrics.addCustomChart(
-            new SimplePie("waila_location", () -> {
-                return getConfig().getString("waila.location");
-            })
-        );
-
-        playerData = new AddonConfig("player.yml");
-
-        WAILAManager.setup();
-        CommandManager.setup();
-        PlaceholderManager.setup();
         hudController = new HudController();
         translationManager = new TranslationManager();
+
+        CommandManager.setup();
+        PlaceholderManager.setup();
+        WAILAManager.setup();
+
+        Metrics metrics = new Metrics(this, 15883);
+        metrics.addCustomChart(new SimplePie("disabled", () -> Boolean.toString(getConfig().getBoolean("waila.disabled", false))));
+        metrics.addCustomChart(new SimplePie("default_display", () -> getConfig().getString("waila.default-display", "bossbar")));
     }
 
     @Override
-    public void disable() {
+    public void onDisable() {
+        WAILAManager.shutdown();
         instance = null;
-        getPlayerData().save();
+    }
+
+    public static SlimeHUD getInstance() {
+        return instance;
     }
 
     public static HudController getHudController() {
@@ -81,7 +56,7 @@ public class SlimeHUD extends AbstractAddon {
         return instance.translationManager;
     }
 
-    public static NamespacedKey newNamespacedKey(@Nonnull String name) {
-        return new NamespacedKey(SlimeHUD.getInstance(), name);
+    public static NamespacedKey newNamespacedKey(String name) {
+        return new NamespacedKey(instance, name);
     }
 }

@@ -1,36 +1,106 @@
-# SlimeHUD
+# SF_SlimeHUD 2.0.1
 
-Adds a WAILA (What Am I Looking At) HUD for Slimefun items. Can be set to display in the bossbar or above the hotbar in `config.yml`. Additional energy/cargo information can also be toggled on or off in `config.yml`. Individual players can also toggle their WAILA HUD with `/slimehud toggle`.
+A modern WAILA-style HUD for **Slimefun Legacy** and vanilla Minecraft blocks/entities.
 
-The HUD lets you see what Slimefun item a block is without breaking or opening its menu. It also displays additional information depending on the block, such as network size, cargo channel, and energy generation. See the [wiki](https://schn.pages.dev/slimehud) for more details.
+This fork keeps the useful Slimefun-specific HUD information from SlimeHUD, modernizes it for current Paper-family servers, and adds general block/entity information inspired by the feature set of WIT / WhatIsThat.
 
-## Preview
+## Server targets
 
-<https://user-images.githubusercontent.com/101147426/182007545-474a6596-b4e2-4a92-bdab-c18ed2286a94.mp4>
+- Minecraft 1.21.11+
+- Paper
+- Purpur
+- Leaf
+- Folia
+- Slimefun Legacy 4.1.50+
+- Java 21 bytecode; CI builds on Java 21 and Java 25
+
+The plugin declares Folia support and uses player/entity scheduling rather than a single global repeating Bukkit task for HUD updates. The CI artifact is also forced to the exact release filename `SF_SlimeHUD2.0.1.jar`.
+
+## Display modes
+
+Every player can choose their own display mode:
+
+- BossBar
+- ActionBar
+
+Commands:
+
+```text
+/slimehud toggle
+/slimehud display bossbar
+/slimehud display actionbar
+/slimehud status
+```
+
+Aliases: `/sfhud`, `/sfh`
+
+Player preferences are stored on the player using PersistentDataContainer, avoiding a shared player-data YAML write on every toggle.
+
+## Slimefun Legacy information
+
+All registered Slimefun items are recognized generically by their Slimefun ID/name, including core items, built-in Slimefun Legacy addons, and external addon items.
+
+Specialized information is shown where the Slimefun API exposes it:
+
+- machine operation progress
+- generator output
+- stored energy / capacity using the modern long-capacity energy API
+- energy network size
+- cargo network size
+- cargo channel
+
+The HUD lookup is cache-only, so simply looking around does not intentionally trigger database reads for unloaded Slimefun block records.
+
+## Vanilla information
+
+Vanilla support is Material-based rather than a hardcoded block list, so newly added vanilla materials automatically receive basic identification.
+
+Optional details include:
+
+- container slot/item fill
+- redstone power
+- crop/age progress
+- levelled block state
+- powered/lit/open state
+- beehive population
+- spawner mob type
+- preferred-tool hint
+- hardness / unbreakable state
+- entity health
+- villager profession and level
+- dropped item count
+
+All detail groups are individually configurable in `config.yml`.
 
 ## PlaceholderAPI
 
-- `%slimehud_toggle%` Returns the current player's toggle state. Possible values are `true` or `false`.
-- `%slimehud_hud%` Standard hud, including block display name and additional information.
-- `%slimehud_hud_block%` Only block display names.
-- `%slimehud_hud_block_info%` Only additional information.
+When PlaceholderAPI is installed:
 
-## Limitations
+```text
+%slimehud_enabled%
+%slimehud_toggle%
+%slimehud_display%
+%slimehud_hud%
+%slimehud_hud_block%
+%slimehud_hud_block_info%
+```
 
-- Minecraft only has 7 colors for the bossbar, compared to 16 for regular items.
+## Build
 
-## API
+```bash
+mvn clean package
+```
 
-API documentation can be found [here](https://schn.pages.dev/slimehud/api-usage) on the wiki.
+The release JAR is always named:
 
-## Requirements
-
-- Spigot or its derivatives
-- Slimefun, of course
+```text
+SF_SlimeHUD2.0.1.jar
+```
 
 ## Credits
 
-Big thanks to Sefiraat for designing and creating the API!
+- Original SlimeHUD by SchnTgaiSpock and contributors
+- WIT / WhatIsThat by darksoulq for modern HUD feature inspiration and Folia-oriented design ideas
+- Slimefun Legacy project and contributors
 
-*InfinityLib* by Mooy1  
-*Lombok* by Project Lombok
+This repository retains its existing license.

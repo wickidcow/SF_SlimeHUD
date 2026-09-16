@@ -2,26 +2,30 @@ package io.github.schntgaispock.slimehud.command;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 
-/**
- * Tab completion for the '/slimehud' command
- */
-public class SlimeHUDTabCompleter implements TabCompleter {
+public final class SlimeHUDTabCompleter implements TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> hints = new ArrayList<>();
-        
         if (args.length == 1) {
-            hints.add("toggle");
-            return hints;
+            return filter(List.of("toggle", "display", "status"), args[0]);
         }
-
-        return hints;
+        if (args.length == 2 && (args[0].equalsIgnoreCase("display") || args[0].equalsIgnoreCase("mode"))) {
+            return filter(List.of("bossbar", "actionbar"), args[1]);
+        }
+        return List.of();
     }
-    
+
+    private List<String> filter(List<String> values, String input) {
+        List<String> result = new ArrayList<>();
+        for (String value : values) {
+            if (value.regionMatches(true, 0, input, 0, input.length())) {
+                result.add(value);
+            }
+        }
+        return result;
+    }
 }
