@@ -1,6 +1,5 @@
 package io.github.schntgaispock.slimehud.waila;
 
-import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.util.HudBuilder;
 import io.github.schntgaispock.slimehud.util.Util;
@@ -18,10 +17,15 @@ import io.github.thebusybiscuit.slimefun4.implementation.items.cargo.CargoNode;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyConnector;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyRegulator;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.generators.SolarGenerator;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import me.mrCookieSlime.Slimefun.Objects.SlimefunItem.abstractItems.AGenerator;
+import org.bukkit.Location;
+import org.bukkit.World;
 
 public final class HudController {
 
@@ -45,7 +49,8 @@ public final class HudController {
             return "";
         }
         Network network = EnergyNet.getNetworkFromLocation(request.getLocation());
-        return network == null ? "" : "Network: " + HudBuilder.getCommaNumber(network.getSize()) + " nodes";
+        int size = networkSize(network);
+        return size < 0 ? "" : "Network: " + HudBuilder.getCommaNumber(size) + " nodes";
     }
 
     private String processCapacitor(HudRequest request) {
@@ -54,10 +59,12 @@ public final class HudController {
         }
         EnergyNetComponent component = (EnergyNetComponent) request.getSlimefunItem();
         EnergyNetComponentType type = component.getEnergyComponentType();
-        long capacity = component.getCapacityLong();
+        long capacity = longEnergyValue(component, "getCapacityLong", null, component.getCapacity());
         if ((type == EnergyNetComponentType.CAPACITOR || type == EnergyNetComponentType.GENERATOR || type == EnergyNetComponentType.CONSUMER)
                 && capacity > 0) {
-            return HudBuilder.formatEnergyStored(component.getChargeLong(request.getLocation()), capacity);
+            long fallbackCharge = component.getCharge(request.getLocation());
+            long charge = longEnergyValue(component, "getChargeLong", request.getLocation(), fallbackCharge);
+            return HudBuilder.formatEnergyStored(charge, capacity);
         }
         return "";
     }
@@ -104,19 +111,15 @@ public final class HudController {
             return "";
         }
         SolarGenerator generator = (SolarGenerator) request.getSlimefunItem();
+        Location location = request.getLocation();
+        World world = location.getWorld();
         int generation = 0;
-        var data = StorageCacheUtils.getDataContainer(request.getLocation());
-        if (data != null && data.isDataLoaded() && !data.isPendingRemove()) {
-            generation = generator.getGeneratedOutput(request.getLocation(), data);
+        if (world.getEnvironment() == World.Environment.NORMAL && location.getBlock().getLightFromSky() >= 15) {
+            long time = world.getTime();
+            boolean day = !world.hasStorm() && !world.isThundering() && (time < 12300 || time > 23850);
+            generation = day ? generator.getDayEnergy() : generator.getNightEnergy();
         }
-        String text = generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
-        if (generator instanceof EnergyNetComponent) {
-            String energy = processCapacitor(request);
-            if (!energy.isEmpty()) {
-                text += " &7| " + energy;
-            }
-        }
-        return text;
+        return generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
     }
 
     private String processCargoNode(HudRequest request) {
@@ -133,7 +136,8 @@ public final class HudController {
             return "";
         }
         Network network = CargoNet.getNetworkFromLocation(request.getLocation());
-        return network == null ? "" : "Network: " + HudBuilder.getCommaNumber(network.getSize()) + " nodes";
+        int size = networkSize(network);
+        return size < 0 ? "" : "Network: " + HudBuilder.getCommaNumber(size) + " nodes";
     }
 
     public String processRequest(HudRequest request) {
@@ -172,12 +176,55 @@ public final class HudController {
         defaultHandlers.put(clazz, handler);
     }
 
+    private int networkSize(Network network) {
+        if (network == null) {
+            return -1;
+        }
+
+        // Slimefun Legacy exposes a public getSize(). Use it when available.
+        try {
+            Method method = network.getClass().getMethod("getSize");
+            Object result = method.invoke(network);
+            if (result instanceof Number number) {
+                return number.intValue();
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fall through to the historical field-based implementation.
+        }
+
+        try {
+            Field connectors = Network.class.getDeclaredField("connectorNodes");
+            Field termini = Network.class.getDeclaredField("terminusNodes");
+            connectors.setAccessible(true);
+            termini.setAccessible(true);
+            int connectorCount = ((Set<?>) connectors.get(network)).size();
+            int terminusCount = ((Set<?>) termini.get(network)).size();
+            return connectorCount + terminusCount + 1;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return -1;
+        }
+    }
+
+    private long longEnergyValue(Object target, String methodName, Location location, long fallback) {
+        try {
+            Method method = location == null
+                    ? target.getClass().getMethod(methodName)
+                    : target.getClass().getMethod(methodName, Location.class);
+            Object result = location == null ? method.invoke(target) : method.invoke(target, location);
+            if (result instanceof Number number) {
+                return number.longValue();
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // The older Slimefun API uses int energy methods, supplied as fallback.
+        }
+        return fallback;
+    }
+
     private boolean config(String path) {
         var config = SlimeHUD.getInstance().getConfig();
         if (config.contains(path)) {
             return config.getBoolean(path);
         }
-
         if (path.startsWith("waila.slimefun.")) {
             String legacyPath = "waila." + path.substring("waila.slimefun.".length());
             if (config.contains(legacyPath)) {
