@@ -42,3 +42,12 @@ The Maven build produces exactly:
 - Slimefun Legacy
 
 The plugin intentionally uses public Bukkit/Paper and Slimefun APIs for generic block and dropped-item discovery. Newly registered Slimefun addon blocks/items and newly introduced vanilla materials therefore do not need to be added to a SlimeHUD item list.
+
+## Compatibility testing
+
+GitHub Actions validates compatibility in two layers:
+
+1. **API compile matrix** — Paper 1.21.11 on Java 21 and Java 25, plus Paper 26.1.2, 26.2, and the current 26.3 pre-release API.
+2. **Runtime smoke matrix** — boots the exact `SF_SlimeHUD2.0.1.jar` with **Slimefun Legacy 4.1.50** on Paper, Purpur, Leaf, and Folia across the supported Minecraft line.
+
+Stable/current production targets are blocking checks. Historical experimental builds and the 26.3 pre-release runtime are advisory so upstream availability or alpha churn is visible without misrepresenting it as a production regression.
