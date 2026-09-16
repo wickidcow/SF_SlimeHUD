@@ -8,12 +8,24 @@ public final class HudBuilder {
 
     private HudBuilder() {}
 
+    public static String formatEnergyStored(int energy) {
+        return formatEnergyStored((long) energy);
+    }
+
     public static String formatEnergyStored(long energy) {
         return getAbbreviatedNumber(energy) + " J Stored";
     }
 
+    public static String formatEnergyStored(int energy, int totalEnergy) {
+        return formatEnergyStored((long) energy, (long) totalEnergy);
+    }
+
     public static String formatEnergyStored(long energy, long totalEnergy) {
         return getAbbreviatedNumber(energy) + "/" + getAbbreviatedNumber(totalEnergy) + " J";
+    }
+
+    public static String formatEnergyGenerated(int energy) {
+        return formatEnergyGenerated((long) energy);
     }
 
     public static String formatEnergyGenerated(long energy) {
