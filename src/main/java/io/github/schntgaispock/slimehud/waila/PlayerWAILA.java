@@ -74,6 +74,14 @@ public final class PlayerWAILA {
         bossBar.removeAll();
     }
 
+    public void cancel() {
+        stop();
+    }
+
+    public void run() {
+        update();
+    }
+
     private void update() {
         if (paused) {
             return;
@@ -196,6 +204,10 @@ public final class PlayerWAILA {
         return player;
     }
 
+    public BossBar getWAILABar() {
+        return bossBar;
+    }
+
     public String getFacing() {
         return facing;
     }
@@ -218,6 +230,19 @@ public final class PlayerWAILA {
             clearFacing();
             clearDisplay();
         }
+    }
+
+    public PlayerWAILA setVisible(boolean visible) {
+        if (!visible) {
+            clearDisplay();
+        } else if (!paused && !facing.isEmpty()) {
+            if (displayMode == DisplayMode.BOSSBAR) {
+                showBossBar();
+            } else {
+                showActionBar();
+            }
+        }
+        return this;
     }
 
     public DisplayMode getDisplayMode() {
