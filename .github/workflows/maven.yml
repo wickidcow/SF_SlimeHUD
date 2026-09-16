@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -64,3 +64,25 @@ jobs:
           path: target/SF_SlimeHUD2.0.1.jar
           archive: false
           if-no-files-found: error
+
+      - name: Publish canonical GitHub Release JAR
+        if: matrix.artifact && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='v2.0.1'
+          JAR='target/SF_SlimeHUD2.0.1.jar'
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            while IFS= read -r OLD; do
+              if [[ "$OLD" == *.jar && "$OLD" != 'SF_SlimeHUD2.0.1.jar' ]]; then
+                gh release delete-asset "$TAG" "$OLD" --repo "$GITHUB_REPOSITORY" -y
+              fi
+            done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+            gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title 'SF_SlimeHUD 2.0.1' \
+              --notes 'SF_SlimeHUD 2.0.1: Slimefun Legacy + WIT-style HUD modernization for Minecraft 1.21.11 through 26.3 compatibility.'
+          fi
