@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -16,13 +15,13 @@ public final class ItemInfoProvider {
 
     public record ItemHud(String name, String info) {}
 
-    public static ItemHud describe(Player player, ItemStack stack, FileConfiguration config) {
+    public static ItemHud describe(ItemStack stack, FileConfiguration config) {
         SlimefunItem slimefunItem = SlimefunItem.getByItem(stack);
         String name;
         List<String> info = new ArrayList<>();
 
         if (slimefunItem != null) {
-            name = SlimeHUD.getTranslationManager().getItemName(player, slimefunItem);
+            name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
             if (config.getBoolean("items.show-slimefun-id", false)) {
                 info.add("ID: " + slimefunItem.getId());
             }
