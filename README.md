@@ -14,7 +14,7 @@ This fork keeps the useful Slimefun-specific HUD information from SlimeHUD, mode
 - Slimefun Legacy 4.1.50+
 - Java 21 bytecode; CI builds on Java 21 and Java 25
 
-The plugin declares Folia support and uses player/entity scheduling rather than a single global repeating Bukkit task for HUD updates.
+The plugin declares Folia support and uses player/entity scheduling rather than a single global repeating Bukkit task for HUD updates. The CI artifact is also forced to the exact release filename `SF_SlimeHUD2.0.1.jar`.
 
 ## Display modes
 
