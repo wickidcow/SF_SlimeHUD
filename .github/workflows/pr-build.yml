@@ -1,0 +1,41 @@
+name: PR Build
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Java ${{ matrix.java }} compile
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [21, 25]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Build
+        run: mvn -B -ntp clean package
+
+      - name: Verify drop-in filename
+        run: test -f target/SF_SlimeHUD2.0.1.jar
+
+      - name: Upload JAR
+        if: matrix.java == 25
+        uses: actions/upload-artifact@v4
+        with:
+          name: SF_SlimeHUD2.0.1
+          path: target/SF_SlimeHUD2.0.1.jar
+          if-no-files-found: error
