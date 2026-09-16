@@ -28,6 +28,7 @@ public final class PlayerWAILA {
     private ScheduledTask task;
     private DisplayMode displayMode;
     private boolean paused;
+    private boolean displayVisible;
     private String facing = "";
     private String facingBlock = "";
     private String facingBlockInfo = "";
@@ -74,7 +75,10 @@ public final class PlayerWAILA {
     }
 
     private void update() {
-        if (!player.isOnline() || !player.isValid() || paused) {
+        if (paused) {
+            return;
+        }
+        if (!player.isOnline() || !player.isValid()) {
             clearDisplay();
             return;
         }
@@ -92,9 +96,10 @@ public final class PlayerWAILA {
         int maxDistance = Math.max(1, SlimeHUD.getInstance().getConfig().getInt("waila.max-distance", 8));
         boolean showItems = SlimeHUD.getInstance().getConfig().getBoolean("items.enabled", true);
 
+        Location eye = player.getEyeLocation();
         RayTraceResult trace = player.getWorld().rayTrace(
-                player.getEyeLocation(),
-                player.getEyeLocation().getDirection(),
+                eye,
+                eye.getDirection(),
                 maxDistance,
                 FluidCollisionMode.NEVER,
                 true,
@@ -145,7 +150,7 @@ public final class PlayerWAILA {
 
     private void showBossBar() {
         if (facing.isEmpty()) {
-            bossBar.setVisible(false);
+            clearDisplay();
             return;
         }
 
@@ -154,20 +159,31 @@ public final class PlayerWAILA {
         if (useAutoBossBarColor) {
             bossBar.setColor(Util.pickBarColorFromName(facing));
         }
+        displayVisible = true;
     }
 
     private void showActionBar() {
         bossBar.setVisible(false);
+        if (facing.isEmpty()) {
+            clearDisplay();
+            return;
+        }
+
         player.spigot().sendMessage(
                 ChatMessageType.ACTION_BAR,
                 TextComponent.fromLegacyText(keepTextColors ? facing : ChatColor.stripColor(facing)));
+        displayVisible = true;
     }
 
     private void clearDisplay() {
         bossBar.setVisible(false);
+        if (!displayVisible) {
+            return;
+        }
         if (player.isOnline()) {
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(""));
         }
+        displayVisible = false;
     }
 
     private void clearFacing() {
