@@ -1,5 +1,6 @@
 package io.github.schntgaispock.slimehud.waila;
 
+import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.util.HudBuilder;
 import io.github.schntgaispock.slimehud.util.Util;
@@ -17,247 +18,161 @@ import io.github.thebusybiscuit.slimefun4.implementation.items.cargo.CargoNode;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyConnector;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyRegulator;
 import io.github.thebusybiscuit.slimefun4.implementation.items.electric.generators.SolarGenerator;
-import me.mrCookieSlime.Slimefun.Objects.SlimefunItem.abstractItems.AGenerator;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.ParametersAreNonnullByDefault;
-import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
+import me.mrCookieSlime.Slimefun.Objects.SlimefunItem.abstractItems.AGenerator;
 
-public class HudController {
+public final class HudController {
 
-    // LinkedHashMaps preserve insertion order. Chances are, a MachineProcessHolder
-    // is also an EnergyNetComponent, but the machine info should take priority over
-    // energy info.
     private final Map<Class<?>, Function<HudRequest, String>> defaultHandlers = new LinkedHashMap<>();
     private final Map<Class<?>, Function<HudRequest, String>> customHandlers = new LinkedHashMap<>();
 
     public HudController() {
-        // Set up Slimefun default items
-
-        // Machines
         registerDefaultHandler(MachineProcessHolder.class, this::processMachine);
-
-        // Generators
         registerDefaultHandler(AGenerator.class, this::processGenerator);
         registerDefaultHandler(SolarGenerator.class, this::processSolarGenerator);
-
-        // Energy Network
         registerDefaultHandler(EnergyRegulator.class, this::processEnergyNode);
         registerDefaultHandler(EnergyConnector.class, this::processEnergyNode);
         registerDefaultHandler(EnergyNetComponent.class, this::processCapacitor);
-
-        // Cargo Network
         registerDefaultHandler(CargoNode.class, this::processCargoNode);
         registerDefaultHandler(CargoConnectorNode.class, this::processCargoManagerConnector);
         registerDefaultHandler(CargoManager.class, this::processCargoManagerConnector);
     }
 
-    @Nonnull
-    private String processEnergyNode(@Nonnull HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-energy-size")) {
+    private String processEnergyNode(HudRequest request) {
+        if (!config("waila.slimefun.show-energy-size")) {
             return "";
         }
-
-        Network en = EnergyNet.getNetworkFromLocation(request.getLocation());
-        int size = getNetworkSize(en);
-        return size < 0 ? "" : "Network Size: " + HudBuilder.getCommaNumber(size);
+        Network network = EnergyNet.getNetworkFromLocation(request.getLocation());
+        return network == null ? "" : "Network: " + HudBuilder.getCommaNumber(network.getSize()) + " nodes";
     }
 
-    @Nonnull
-    private String processCapacitor(@Nonnull HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-energy-stored")) {
+    private String processCapacitor(HudRequest request) {
+        if (!config("waila.slimefun.show-energy-stored")) {
             return "";
         }
-
-        EnergyNetComponent enc = (EnergyNetComponent) request.getSlimefunItem();
-        EnergyNetComponentType enct = enc.getEnergyComponentType();
-        if ((enct == EnergyNetComponentType.CAPACITOR ||
-                enct == EnergyNetComponentType.GENERATOR ||
-                enct == EnergyNetComponentType.CONSUMER) &&
-                enc.getCapacity() > 0) {
-            return HudBuilder.formatEnergyStored(enc.getCharge(request.getLocation()), enc.getCapacity());
+        EnergyNetComponent component = (EnergyNetComponent) request.getSlimefunItem();
+        EnergyNetComponentType type = component.getEnergyComponentType();
+        long capacity = component.getCapacityLong();
+        if ((type == EnergyNetComponentType.CAPACITOR || type == EnergyNetComponentType.GENERATOR || type == EnergyNetComponentType.CONSUMER)
+                && capacity > 0) {
+            return HudBuilder.formatEnergyStored(component.getChargeLong(request.getLocation()), capacity);
         }
         return "";
     }
 
-    @Nonnull
     @SuppressWarnings("unchecked")
-    private String processMachine(@Nonnull HudRequest request) {
-        StringBuilder hudText = new StringBuilder();
-
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-machine-progress")) {
+    private String processMachine(HudRequest request) {
+        if (!config("waila.slimefun.show-machine-progress")) {
             return "";
         }
-
-        MachineProcessHolder<MachineOperation> machine = (MachineProcessHolder<MachineOperation>) request
-                .getSlimefunItem();
+        MachineProcessHolder<MachineOperation> machine = (MachineProcessHolder<MachineOperation>) request.getSlimefunItem();
         MachineOperation operation = machine.getMachineProcessor().getOperation(request.getLocation());
-
         if (operation == null) {
-            hudText.append("Idle");
-            if (request.getSlimefunItem() instanceof EnergyNetComponent) {
-                hudText.append(" ").append(processCapacitor(request));
-            }
-            return hudText.toString();
+            String energy = request.getSlimefunItem() instanceof EnergyNetComponent ? processCapacitor(request) : "";
+            return energy.isEmpty() ? "Idle" : "Idle &7| " + energy;
         }
-
-        int progress = operation.getProgress();
-        int total = operation.getTotalTicks();
-        
-        hudText.append(HudBuilder.formatProgressBar(progress, total));
-        
+        String text = HudBuilder.formatProgressBar(operation.getProgress(), operation.getTotalTicks());
         if (request.getSlimefunItem() instanceof AGenerator) {
-            hudText.append(" ").append(processGenerator(request));
-        }
-
-        return hudText.toString();
-    }
-
-    @Nonnull
-    private String processGenerator(@Nonnull HudRequest request) {
-        StringBuilder hudText = new StringBuilder();
-
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation")) {
-            return "";
-        }
-
-        AGenerator gen = (AGenerator) request.getSlimefunItem();
-        int generation = gen.getEnergyProduction();
-        if (generation > 0) {
-            hudText.append(HudBuilder.formatEnergyGenerated(generation));
-        } else {
-            hudText.append("Not generating");
-        }
-
-        if (gen instanceof EnergyNetComponent) {
-            hudText.append(" ").append(processCapacitor(request));
-        }
-
-        return hudText.toString();
-    }
-
-    @Nonnull
-    private String processSolarGenerator(@Nonnull HudRequest request) {
-        StringBuilder hudText = new StringBuilder();
-
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation")) {
-            return "";
-        }
-
-        SolarGenerator gen = (SolarGenerator) request.getSlimefunItem();
-        // Solar Generators dont use any fuel, so it's ok to call getGeneratedOutput
-        int generation = gen.getGeneratedOutput(request.getLocation(), null);
-        if (generation > 0) {
-            hudText.append(HudBuilder.formatEnergyGenerated(generation));
-        } else {
-            hudText.append("Not generating");
-        }
-
-        if (gen instanceof EnergyNetComponent) {
-            hudText.append(" ").append(processCapacitor(request));
-        }
-
-        return hudText.toString();
-    }
-
-    @Nonnull
-    private String processCargoNode(@Nonnull HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-cargo-channel")) {
-            return "";
-        }
-        CargoNode cn = (CargoNode) request.getSlimefunItem();
-        int channel = cn.getSelectedChannel(request.getLocation().getBlock()) + 1;
-        return "Channel: " + Util.getColorFromCargoChannel(channel).toString() + channel;
-    }
-
-    @Nonnull
-    private String processCargoManagerConnector(@Nonnull HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-cargo-size")) {
-            return "";
-        }
-        Network cn = CargoNet.getNetworkFromLocation(request.getLocation());
-
-        int size = getNetworkSize(cn);
-        return size < 0 ? "" : "Network Size: " + HudBuilder.getCommaNumber(size);
-    }
-
-    private int getNetworkSize(Network network) {
-        if (network != null) {
-            try {
-                Field con = Network.class.getDeclaredField("connectorNodes");
-                Field ter = Network.class.getDeclaredField("terminusNodes");
-
-                con.setAccessible(true);
-                ter.setAccessible(true);
-
-                int conSize = ((Set<?>) con.get(network)).size();
-                int terSize = ((Set<?>) ter.get(network)).size();
-
-                con.setAccessible(false);
-                ter.setAccessible(false);
-                return conSize + terSize + 1;
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                e.printStackTrace();
+            String generation = processGenerator(request);
+            if (!generation.isEmpty()) {
+                text += " &7| " + generation;
             }
         }
-        return -1;
+        return text;
     }
 
-    @Nullable
-    private Function<HudRequest, String> tryGetHandler(@Nonnull SlimefunItem slimefunItem) {
-        // First see if there is a custom handler from an addon (to allow overriding the
-        // default machine handler)
+    private String processGenerator(HudRequest request) {
+        if (!config("waila.slimefun.show-generator-generation")) {
+            return "";
+        }
+        AGenerator generator = (AGenerator) request.getSlimefunItem();
+        int generation = generator.getEnergyProduction();
+        String text = generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
+        if (generator instanceof EnergyNetComponent) {
+            String energy = processCapacitor(request);
+            if (!energy.isEmpty()) {
+                text += " &7| " + energy;
+            }
+        }
+        return text;
+    }
+
+    private String processSolarGenerator(HudRequest request) {
+        if (!config("waila.slimefun.show-generator-generation")) {
+            return "";
+        }
+        SolarGenerator generator = (SolarGenerator) request.getSlimefunItem();
+        int generation = 0;
+        var data = StorageCacheUtils.getDataContainer(request.getLocation());
+        if (data != null && data.isDataLoaded() && !data.isPendingRemove()) {
+            generation = generator.getGeneratedOutput(request.getLocation(), data);
+        }
+        String text = generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
+        if (generator instanceof EnergyNetComponent) {
+            String energy = processCapacitor(request);
+            if (!energy.isEmpty()) {
+                text += " &7| " + energy;
+            }
+        }
+        return text;
+    }
+
+    private String processCargoNode(HudRequest request) {
+        if (!config("waila.slimefun.show-cargo-channel")) {
+            return "";
+        }
+        CargoNode node = (CargoNode) request.getSlimefunItem();
+        int channel = node.getSelectedChannel(request.getLocation().getBlock()) + 1;
+        return "Channel: " + Util.getColorFromCargoChannel(channel) + channel;
+    }
+
+    private String processCargoManagerConnector(HudRequest request) {
+        if (!config("waila.slimefun.show-cargo-size")) {
+            return "";
+        }
+        Network network = CargoNet.getNetworkFromLocation(request.getLocation());
+        return network == null ? "" : "Network: " + HudBuilder.getCommaNumber(network.getSize()) + " nodes";
+    }
+
+    public String processRequest(HudRequest request) {
+        Function<HudRequest, String> handler = tryGetHandler(request.getSlimefunItem());
+        if (handler == null) {
+            return "";
+        }
+        try {
+            String result = handler.apply(request);
+            return result == null ? "" : result;
+        } catch (RuntimeException | LinkageError ex) {
+            SlimeHUD.getInstance().getLogger().fine(() -> "HUD handler skipped for " + request.getSlimefunItem().getId() + ": " + ex.getMessage());
+            return "";
+        }
+    }
+
+    private Function<HudRequest, String> tryGetHandler(SlimefunItem item) {
         for (Map.Entry<Class<?>, Function<HudRequest, String>> entry : customHandlers.entrySet()) {
-            if (entry.getKey().isInstance(slimefunItem)) {
+            if (entry.getKey().isInstance(item)) {
                 return entry.getValue();
             }
         }
         for (Map.Entry<Class<?>, Function<HudRequest, String>> entry : defaultHandlers.entrySet()) {
-            if (entry.getKey().isInstance(slimefunItem)) {
+            if (entry.getKey().isInstance(item)) {
                 return entry.getValue();
             }
         }
         return null;
     }
 
-    @Nonnull
-    public String processRequest(@Nonnull HudRequest request) {
-        Function<HudRequest, String> handler = tryGetHandler(request.getSlimefunItem());
-        if (handler == null) {
-            // No handler found, return empty string
-            return "";
-        } else {
-            String ret = handler.apply(request);
-            if (ret == null) return "";
-            if (ret.startsWith("&7| ")) {
-                ret = ret.replaceFirst("&7\\| ", "&7");
-            } else if (ret.startsWith("§7| ")) {
-                ret = ret.replaceFirst("§7\\| ", "&7");
-            }
-            return ret;
-        }
-    }
-
-    @ParametersAreNonnullByDefault
-    private void registerDefaultHandler(Class<?> clazz, Function<HudRequest, String> handler) {
-        defaultHandlers.put(clazz, handler);
-    }
-
-    /**
-     * Register a custom handler for when a player looks at a Slimefun Item
-     * 
-     * @param clazz   The class extending {@code SlimefunItem}
-     * @param handler A function that takes a {@code HudRequest} and returns
-     *                formatted text to be displayed on the WAILA HUD
-     */
-    @ParametersAreNonnullByDefault
     public void registerCustomHandler(Class<?> clazz, Function<HudRequest, String> handler) {
         customHandlers.put(clazz, handler);
     }
 
+    private void registerDefaultHandler(Class<?> clazz, Function<HudRequest, String> handler) {
+        defaultHandlers.put(clazz, handler);
+    }
+
+    private boolean config(String path) {
+        return SlimeHUD.getInstance().getConfig().getBoolean(path, true);
+    }
 }

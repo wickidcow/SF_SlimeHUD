@@ -1,50 +1,52 @@
 options:
-
-  auto-update: true
-
-  # Use PlaceholderAPI to get the player's toggle status
   placeholder-api-support: true
 
-  # Use SlimefunTranslation to display the translated name of items
-  slimefun-translation-support: true
-
 waila:
-
-  # If set to true, will disable waila for all players,
-  # overriding individual preferences and 'disabled-in'
+  # Master switch.
   disabled: false
 
-  # List of worlds that the WAILA is disabled in
+  # Players start with the HUD enabled unless they have saved a preference.
+  enabled-by-default: true
+
+  # Worlds where the HUD is hidden.
   disabled-in: []
 
-  # Can be 'bossbar' or 'hotbar'
+  # Default player display. Existing configs using "location" are still read as a fallback.
+  # Valid: bossbar, actionbar
+  default-display: bossbar
   location: bossbar
 
-  # Whether or not to keep colors and format of the text. If set to false, defaults to white.
+  # Maximum look distance in blocks.
+  range: 6.0
+
+  # Update rate in game ticks. 10 = twice per second.
+  tick-rate: 10
+
+  # Keep Slimefun/legacy color codes in HUD text.
   use-original-colors: true
 
-  # The color of the bossbar. Must be a valid color in 'snake_case'.
-  # 'inherit' means 'match the color of the bossbar to that of the text'.
-  # 'default' is white
+  # Boss bar color: inherit, white, red, yellow, green, blue, purple, pink.
   bossbar-color: inherit
 
-  # How many nodes on the cargo network; shown on connectors and managers
-  show-cargo-size: true
+  slimefun:
+    show-cargo-size: true
+    show-cargo-channel: true
+    show-energy-size: true
+    show-energy-stored: true
+    show-machine-progress: true
+    show-generator-generation: true
 
-  # Shown on output and input nodes
-  show-cargo-channel: true
+  vanilla:
+    # Generic Material-based lookup means new vanilla blocks work without a hardcoded item list.
+    enabled: true
+    show-container-fill: true
+    show-redstone: true
+    show-block-state: true
+    show-tool-hint: true
+    show-hardness: true
 
-  # How many nodes on the energy network; shown on connectors and regulators
-  show-energy-size: true
-
-  # Shown on capacitors
-  show-energy-stored: true
-
-  # Shown on most machines
-  show-machine-progress: true
-
-  # Shown on most generators
-  show-generator-generation: true
-
-  # Rate at which WAILA updates, in *game* ticks
-  tick-rate: 10
+  entities:
+    enabled: true
+    show-health: true
+    show-villager-info: true
+    show-item-stack: true
