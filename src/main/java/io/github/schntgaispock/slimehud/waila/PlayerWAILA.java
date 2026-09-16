@@ -4,6 +4,7 @@ import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.util.Util;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import java.util.concurrent.atomic.AtomicLong;
 import me.mrCookieSlime.Slimefun.api.BlockStorage;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -16,14 +17,18 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.RayTraceResult;
 
 public final class PlayerWAILA {
+
+    private record HudSnapshot(String name, String info) {}
 
     private final Player player;
     private final BossBar bossBar;
     private final boolean useAutoBossBarColor;
     private final boolean keepTextColors;
+    private final AtomicLong requestSequence = new AtomicLong();
 
     private ScheduledTask task;
     private DisplayMode displayMode;
@@ -60,12 +65,13 @@ public final class PlayerWAILA {
         task = player.getScheduler().runAtFixedRate(
                 SlimeHUD.getInstance(),
                 scheduledTask -> update(),
-                this::clearDisplay,
+                null,
                 1L,
                 period);
     }
 
     public void stop() {
+        requestSequence.incrementAndGet();
         if (task != null) {
             task.cancel();
             task = null;
@@ -91,16 +97,7 @@ public final class PlayerWAILA {
             return;
         }
 
-        updateFacing();
-
-        if (displayMode == DisplayMode.BOSSBAR) {
-            showBossBar();
-        } else {
-            showActionBar();
-        }
-    }
-
-    private void updateFacing() {
+        long sequence = requestSequence.incrementAndGet();
         int maxDistance = Math.max(1, SlimeHUD.getInstance().getConfig().getInt("waila.max-distance", 8));
         boolean showItems = SlimeHUD.getInstance().getConfig().getBoolean("items.enabled", true);
 
@@ -115,45 +112,99 @@ public final class PlayerWAILA {
                 entity -> showItems && entity instanceof Item);
 
         if (trace == null) {
-            clearFacing();
+            applySnapshot(sequence, new HudSnapshot("", ""));
             return;
         }
 
         if (trace.getHitEntity() instanceof Item droppedItem) {
-            ItemInfoProvider.ItemHud itemHud = ItemInfoProvider.describe(
-                    player, droppedItem.getItemStack(), SlimeHUD.getInstance().getConfig());
-            facingBlock = itemHud.name();
-            facingBlockInfo = itemHud.info();
-            buildFacingText();
+            inspectItem(sequence, droppedItem);
             return;
         }
 
-        Block targetBlock = trace.getHitBlock();
-        if (targetBlock == null || targetBlock.getType().isAir()) {
-            clearFacing();
+        Block hitBlock = trace.getHitBlock();
+        if (hitBlock == null || hitBlock.getType().isAir()) {
+            applySnapshot(sequence, new HudSnapshot("", ""));
             return;
         }
 
-        SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
-        if (slimefunItem != null) {
-            Location target = targetBlock.getLocation();
-            HudRequest request = new HudRequest(slimefunItem, target, player);
-            facingBlock = SlimeHUD.getTranslationManager().getItemName(player, slimefunItem);
-            facingBlockInfo = SlimeHUD.getHudController().processRequest(request);
-        } else if (SlimeHUD.getInstance().getConfig().getBoolean("vanilla.enabled", true)) {
-            facingBlock = "&f" + VanillaInfoProvider.getName(targetBlock);
-            facingBlockInfo = VanillaInfoProvider.getInfo(targetBlock, player, SlimeHUD.getInstance().getConfig());
+        ItemStack heldItem = player.getInventory().getItemInMainHand().clone();
+        inspectBlock(sequence, hitBlock.getLocation(), heldItem);
+    }
+
+    private void inspectItem(long sequence, Item droppedItem) {
+        droppedItem.getScheduler().run(
+                SlimeHUD.getInstance(),
+                scheduledTask -> {
+                    ItemStack stack = droppedItem.getItemStack().clone();
+                    ItemInfoProvider.ItemHud itemHud =
+                            ItemInfoProvider.describe(stack, SlimeHUD.getInstance().getConfig());
+                    publishSnapshot(sequence, new HudSnapshot(itemHud.name(), itemHud.info()));
+                },
+                null);
+    }
+
+    private void inspectBlock(long sequence, Location target, ItemStack heldItem) {
+        Bukkit.getRegionScheduler().execute(SlimeHUD.getInstance(), target, () -> {
+            Block targetBlock = target.getBlock();
+            if (targetBlock.getType().isAir()) {
+                publishSnapshot(sequence, new HudSnapshot("", ""));
+                return;
+            }
+
+            SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
+            if (slimefunItem != null) {
+                HudRequest request = new HudRequest(slimefunItem, target, player);
+                String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
+                String info = SlimeHUD.getHudController().processRequest(request);
+                publishSnapshot(sequence, new HudSnapshot(name, info));
+                return;
+            }
+
+            if (SlimeHUD.getInstance().getConfig().getBoolean("vanilla.enabled", true)) {
+                String name = "&f" + VanillaInfoProvider.getName(targetBlock);
+                String info = VanillaInfoProvider.getInfo(
+                        targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                publishSnapshot(sequence, new HudSnapshot(name, info));
+                return;
+            }
+
+            publishSnapshot(sequence, new HudSnapshot("", ""));
+        });
+    }
+
+    private void publishSnapshot(long sequence, HudSnapshot snapshot) {
+        player.getScheduler().run(
+                SlimeHUD.getInstance(),
+                scheduledTask -> applySnapshot(sequence, snapshot),
+                null);
+    }
+
+    private void applySnapshot(long sequence, HudSnapshot snapshot) {
+        if (sequence != requestSequence.get() || paused || !player.isOnline()) {
+            return;
+        }
+
+        facingBlock = snapshot.name();
+        facingBlockInfo = snapshot.info();
+        if (facingBlock.isEmpty()) {
+            facing = "";
         } else {
-            clearFacing();
-            return;
+            buildFacingText();
         }
-
-        buildFacingText();
+        renderCurrent();
     }
 
     private void buildFacingText() {
         facing = ChatColor.translateAlternateColorCodes(
                 '&', facingBlock + (facingBlockInfo.isEmpty() ? "" : " &7| " + facingBlockInfo));
+    }
+
+    private void renderCurrent() {
+        if (displayMode == DisplayMode.BOSSBAR) {
+            showBossBar();
+        } else {
+            showActionBar();
+        }
     }
 
     private void showBossBar() {
@@ -226,6 +277,7 @@ public final class PlayerWAILA {
 
     public void setPaused(boolean paused) {
         this.paused = paused;
+        requestSequence.incrementAndGet();
         if (paused) {
             clearFacing();
             clearDisplay();
@@ -236,11 +288,7 @@ public final class PlayerWAILA {
         if (!visible) {
             clearDisplay();
         } else if (!paused && !facing.isEmpty()) {
-            if (displayMode == DisplayMode.BOSSBAR) {
-                showBossBar();
-            } else {
-                showActionBar();
-            }
+            renderCurrent();
         }
         return this;
     }
