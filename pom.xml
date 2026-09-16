@@ -10,6 +10,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
+        <lombok.version>1.18.48</lombok.version>
     </properties>
 
     <repositories>
@@ -51,6 +52,14 @@
                 <version>3.14.1</version>
                 <configuration>
                     <release>${maven.compiler.release}</release>
+                    <proc>full</proc>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                     <excludes>
                         <exclude>**/package-info.java</exclude>
                     </excludes>
@@ -125,7 +134,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.48</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
