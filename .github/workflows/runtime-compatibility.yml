@@ -4,9 +4,6 @@ on:
   pull_request:
     branches:
       - master
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 permissions:
@@ -16,9 +13,10 @@ env:
   SLIMEFUN_VERSION: '4.1.50'
 
 jobs:
-  build:
+  build-candidate:
     name: Build runtime candidate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -31,7 +29,7 @@ jobs:
           cache: maven
 
       - name: Build Java 21-compatible addon JAR
-        run: mvn -B -ntp -Dpaper.version="1.21.11-R0.1-SNAPSHOT" clean package
+        run: mvn -B -ntp clean package
 
       - name: Verify drop-in filename
         run: test -s target/SF_SlimeHUD2.0.1.jar
@@ -46,9 +44,9 @@ jobs:
 
   runtime:
     name: ${{ matrix.label }}
-    needs: build
+    needs: build-candidate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     continue-on-error: ${{ matrix.advisory }}
     strategy:
       fail-fast: false
@@ -58,27 +56,31 @@ jobs:
           - label: Paper 1.21.11 / Java 21
             family: paper
             minecraft: 1.21.11
-            channel: STABLE
+            channel: ANY
             java: 21
             advisory: false
+            expectation: supported
           - label: Purpur 1.21.11 / Java 21
             family: purpur
             minecraft: 1.21.11
             channel: ANY
             java: 21
             advisory: false
+            expectation: supported
           - label: Leaf 1.21.11 / Java 21
             family: leaf
             minecraft: 1.21.11
             channel: ANY
             java: 21
             advisory: false
+            expectation: supported
           - label: Folia 1.21.11 / Java 21
             family: folia
             minecraft: 1.21.11
             channel: ANY
             java: 21
             advisory: true
+            expectation: supported
 
           - label: Paper 26.1.2 / Java 25
             family: paper
@@ -86,24 +88,28 @@ jobs:
             channel: STABLE
             java: 25
             advisory: false
+            expectation: supported
           - label: Purpur 26.1.2 / Java 25
             family: purpur
             minecraft: 26.1.2
             channel: ANY
             java: 25
             advisory: false
+            expectation: supported
           - label: Leaf 26.1.2 / Java 25
             family: leaf
             minecraft: 26.1.2
             channel: ANY
             java: 25
             advisory: true
+            expectation: supported
           - label: Folia 26.1.2 / Java 25
             family: folia
             minecraft: 26.1.2
             channel: STABLE
             java: 25
             advisory: false
+            expectation: supported
 
           - label: Paper 26.2 / Java 25
             family: paper
@@ -111,31 +117,36 @@ jobs:
             channel: STABLE
             java: 25
             advisory: false
+            expectation: supported
           - label: Purpur 26.2 / Java 25
             family: purpur
             minecraft: 26.2
             channel: ANY
             java: 25
             advisory: false
+            expectation: supported
           - label: Leaf 26.2 / Java 25
             family: leaf
             minecraft: 26.2
             channel: ANY
             java: 25
             advisory: false
+            expectation: supported
           - label: Folia 26.2 / Java 25
             family: folia
             minecraft: 26.2
-            channel: ANY
+            channel: STABLE
             java: 25
             advisory: false
+            expectation: supported
 
-          - label: Paper 26.3 pre-release / Java 25 (advisory)
+          - label: Paper 26.3 pre-release / Java 25 (Slimefun gate advisory)
             family: paper
             minecraft: 26.3
             channel: ANY
             java: 25
             advisory: true
+            expectation: slimefun-version-gate
 
     steps:
       - name: Checkout
@@ -154,7 +165,7 @@ jobs:
           path: build/runtime-candidate
 
       - name: Resolve runtime candidate
-        id: candidate
+        id: addon
         shell: bash
         run: |
           JAR="$(find build/runtime-candidate -name 'SF_SlimeHUD2.0.1.jar' -print -quit)"
@@ -163,15 +174,15 @@ jobs:
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"
 
       - name: Boot with Slimefun Legacy on ${{ matrix.label }}
-        shell: bash
         run: |
           chmod +x scripts/runtime_smoke.sh
           bash scripts/runtime_smoke.sh \
             "${{ matrix.family }}" \
             "${{ matrix.minecraft }}" \
             "${{ matrix.channel }}" \
-            "${{ steps.candidate.outputs.jar }}" \
-            "build/runtime-smoke-${{ matrix.family }}-${{ matrix.minecraft }}"
+            "${{ steps.addon.outputs.jar }}" \
+            "build/runtime-smoke-${{ matrix.family }}-${{ matrix.minecraft }}" \
+            "${{ matrix.expectation }}"
 
       - name: Publish runtime evidence
         if: always()

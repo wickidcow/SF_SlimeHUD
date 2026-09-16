@@ -8,6 +8,7 @@ import io.github.schntgaispock.slimehud.waila.HudController;
 import io.github.schntgaispock.slimehud.waila.WAILAManager;
 import java.util.logging.Level;
 import org.bukkit.NamespacedKey;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SlimeHUD extends JavaPlugin {
@@ -21,6 +22,14 @@ public final class SlimeHUD extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+
+        Plugin slimefun = getServer().getPluginManager().getPlugin("Slimefun");
+        if (slimefun == null || !slimefun.isEnabled()) {
+            getLogger().severe("Slimefun is unavailable or disabled. SF_SlimeHUD cannot start without its required dependency.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         saveDefaultConfig();
 
         playerData = new PlayerDataStore(this);

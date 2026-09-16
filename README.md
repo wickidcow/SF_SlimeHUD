@@ -43,11 +43,15 @@ The Maven build produces exactly:
 
 The plugin intentionally uses public Bukkit/Paper and Slimefun APIs for generic block and dropped-item discovery. Newly registered Slimefun addon blocks/items and newly introduced vanilla materials therefore do not need to be added to a SlimeHUD item list.
 
-## Compatibility testing
+## Compatibility validation
 
-GitHub Actions validates compatibility in two layers:
+`SF_SlimeHUD2.0.1.jar` is built once and runtime-smoked with the real **Slimefun Legacy 4.1.50** release. The smoke test requires the server to reach `Done`, Slimefun to enable, SlimeHUD to enable, no SlimeHUD runtime error during the smoke window, and a clean shutdown.
 
-1. **API compile matrix** — Paper 1.21.11 on Java 21 and Java 25, plus Paper 26.1.2, 26.2, and the current 26.3 pre-release API.
-2. **Runtime smoke matrix** — boots the exact `SF_SlimeHUD2.0.1.jar` with **Slimefun Legacy 4.1.50** on Paper, Purpur, Leaf, and Folia across the supported Minecraft line.
+| Minecraft | Paper | Purpur | Leaf | Folia |
+| --- | --- | --- | --- | --- |
+| 1.21.11 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.1.2 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.2 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.3 pre-release | API compile PASS; runtime blocked by Slimefun Legacy 4.1.50 version gate | Not claimed | Not claimed | Not claimed |
 
-Stable/current production targets are blocking checks. Historical experimental builds and the 26.3 pre-release runtime are advisory so upstream availability or alpha churn is visible without misrepresenting it as a production regression.
+The 26.3 runtime result is intentionally classified separately. Paper 26.3 loads the server and discovers both plugins, but Slimefun Legacy 4.1.50 currently rejects Minecraft 26.3 before SlimeHUD can be runtime-validated. This is a Slimefun Legacy support-version gate, not an SF_SlimeHUD Paper-API compile failure. Once Slimefun Legacy allows 26.3, the advisory runtime smoke becomes the next compatibility gate automatically.

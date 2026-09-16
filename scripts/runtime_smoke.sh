@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FAMILY="${1:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory]}"
-MC_VERSION="${2:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory]}"
-CHANNEL="${3:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory]}"
-ADDON_JAR="${4:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory]}"
+FAMILY="${1:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory] [expectation]}"
+MC_VERSION="${2:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory] [expectation]}"
+CHANNEL="${3:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory] [expectation]}"
+ADDON_JAR="${4:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-version> <channel> <addon-jar> [work-directory] [expectation]}"
 WORK_DIR="${5:-build/runtime-smoke-${FAMILY}-${MC_VERSION}}"
+EXPECTATION="${6:-supported}"
 
 SLIMEFUN_VERSION="${SLIMEFUN_VERSION:-4.1.50}"
 SLIMEFUN_URL="${SLIMEFUN_URL:-https://github.com/wickidcow/Slimefun-Legacy/releases/download/v${SLIMEFUN_VERSION}/Slimefun-Legacy${SLIMEFUN_VERSION}.jar}"
@@ -29,6 +30,14 @@ case "$FAMILY" in
     paper|purpur|leaf|folia) ;;
     *)
         echo "Unsupported server family: $FAMILY" >&2
+        exit 1
+        ;;
+esac
+
+case "$EXPECTATION" in
+    supported|slimefun-version-gate) ;;
+    *)
+        echo "Unsupported runtime expectation: $EXPECTATION" >&2
         exit 1
         ;;
 esac
@@ -127,6 +136,7 @@ Download: ${SERVER_URL}
 Java: $(java -version 2>&1 | head -n 1)
 Slimefun Legacy: ${SLIMEFUN_VERSION}
 Addon: SF_SlimeHUD 2.0.1
+Expectation: ${EXPECTATION}
 EOF_BUILD
 
 INPUT_FIFO="$WORK_DIR/server.stdin"
@@ -190,6 +200,44 @@ exec 3>&-
 
 if (( SERVER_STATUS != 0 )); then
     echo "${FAMILY} ${MC_VERSION}: server exited with status ${SERVER_STATUS}." >&2
+    cat "$CONSOLE_LOG" >&2 || true
+    exit 1
+fi
+
+SLIMEFUN_VERSION_GATE=false
+if grep -Fq 'You are using an unsupported Minecraft version!' "$CONSOLE_LOG" && \
+   grep -Fq "You are running Minecraft ${MC_VERSION}" "$CONSOLE_LOG"; then
+    SLIMEFUN_VERSION_GATE=true
+fi
+
+if [[ "$EXPECTATION" == "slimefun-version-gate" ]]; then
+    if [[ "$SLIMEFUN_VERSION_GATE" != true ]]; then
+        echo "${FAMILY} ${MC_VERSION}: expected the Slimefun Legacy version gate, but it was not observed." >&2
+        cat "$CONSOLE_LOG" >&2 || true
+        exit 1
+    fi
+
+    cat > "$WORK_DIR/smoke-result.txt" <<EOF_RESULT
+SF_SlimeHUD runtime smoke: BLOCKED_BY_SLIMEFUN_VERSION_GATE
+Server family: ${FAMILY}
+Minecraft: ${MC_VERSION}
+Build: ${SERVER_BUILD}
+Channel: ${SERVER_CHANNEL}
+Slimefun Legacy: ${SLIMEFUN_VERSION}
+SF_SlimeHUD: 2.0.1
+Server reached Done: yes
+Slimefun enabled: no
+Reason: Slimefun Legacy ${SLIMEFUN_VERSION} rejects Minecraft ${MC_VERSION} before SF_SlimeHUD can be runtime-validated.
+SF_SlimeHUD API compile: covered separately by the Paper ${MC_VERSION} compile target.
+Addon runtime verdict: not tested because the required dependency disabled itself first.
+EOF_RESULT
+    cat "$WORK_DIR/smoke-result.txt"
+    # Keep the advisory target visibly non-green while classifying the known dependency blocker.
+    exit 2
+fi
+
+if [[ "$SLIMEFUN_VERSION_GATE" == true ]]; then
+    echo "${FAMILY} ${MC_VERSION}: Slimefun Legacy ${SLIMEFUN_VERSION} rejected this Minecraft version unexpectedly." >&2
     cat "$CONSOLE_LOG" >&2 || true
     exit 1
 fi
