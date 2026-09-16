@@ -1,50 +1,56 @@
 options:
-
-  auto-update: true
-
-  # Use PlaceholderAPI to get the player's toggle status
   placeholder-api-support: true
 
-  # Use SlimefunTranslation to display the translated name of items
-  slimefun-translation-support: true
-
 waila:
-
-  # If set to true, will disable waila for all players,
-  # overriding individual preferences and 'disabled-in'
+  # Disable the HUD globally.
   disabled: false
 
-  # List of worlds that the WAILA is disabled in
+  # Worlds where the HUD is disabled.
   disabled-in: []
 
-  # Can be 'bossbar' or 'hotbar'
+  # Default per-player display. Players can override with /slimehud display.
+  # Valid values: bossbar, actionbar
+  default-display: bossbar
+
+  # Legacy compatibility: old configs used bossbar/hotbar here.
   location: bossbar
 
-  # Whether or not to keep colors and format of the text. If set to false, defaults to white.
+  # How far players can inspect blocks.
+  max-distance: 8
+
+  # Update interval in ticks. WIT uses a fast polling model; 5 ticks keeps the
+  # display responsive without doing work every tick.
+  tick-rate: 5
+
+  # Keep Slimefun/vanilla color codes in the HUD.
   use-original-colors: true
 
-  # The color of the bossbar. Must be a valid color in 'snake_case'.
-  # 'inherit' means 'match the color of the bossbar to that of the text'.
-  # 'default' is white
+  # Bossbar color: red, yellow, green, blue, purple, pink, white, default, inherit
   bossbar-color: inherit
 
-  # How many nodes on the cargo network; shown on connectors and managers
+  # Slimefun Legacy machine information.
   show-cargo-size: true
-
-  # Shown on output and input nodes
   show-cargo-channel: true
-
-  # How many nodes on the energy network; shown on connectors and regulators
   show-energy-size: true
-
-  # Shown on capacitors
   show-energy-stored: true
-
-  # Shown on most machines
   show-machine-progress: true
-
-  # Shown on most generators
   show-generator-generation: true
 
-  # Rate at which WAILA updates, in *game* ticks
-  tick-rate: 10
+vanilla:
+  # Generic vanilla block support is automatic; new Materials do not need to be
+  # added to a list. The switches below control extra state details.
+  enabled: true
+  show-redstone: true
+  show-crop-age: true
+  show-beehive: true
+  show-smelting: true
+  show-brewing: true
+  show-container-items: true
+  show-beacon-effects: true
+  show-spawner-type: true
+  show-note-block: true
+  show-farmland: true
+  show-tool: true
+  show-waterlogged: false
+  show-open-state: false
+  show-lit-state: false

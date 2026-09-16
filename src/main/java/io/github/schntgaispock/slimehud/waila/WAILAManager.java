@@ -1,12 +1,10 @@
 package io.github.schntgaispock.slimehud.waila;
 
+import io.github.schntgaispock.slimehud.SlimeHUD;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import javax.annotation.Nonnull;
-
+import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,82 +13,112 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import io.github.schntgaispock.slimehud.SlimeHUD;
-import lombok.Getter;
-
-/**
- * Keeps track of all the online players and their HUDs
- */
-public class WAILAManager implements Listener {
+public final class WAILAManager implements Listener {
 
     private static WAILAManager instance;
-    private @Getter Map<UUID, PlayerWAILA> wailas = new HashMap<>();
 
-    private WAILAManager() {
-    }
+    private final Map<UUID, PlayerWAILA> wailas = new ConcurrentHashMap<>();
+
+    private WAILAManager() {}
 
     public static WAILAManager getInstance() {
-        if (instance == null)
+        if (instance == null) {
             instance = new WAILAManager();
+        }
         return instance;
     }
 
-    private void generateWAILA(@Nonnull Player player) {
-        PlayerWAILA waila;
-        if (!wailas.containsKey(player.getUniqueId())) {
-            waila = new PlayerWAILA(player);
-            waila.runTaskTimer(
-                    SlimeHUD.getInstance(),
-                    0l,
-                    SlimeHUD.getInstance().getConfig().getLong("waila.tick-rate"));
-            wailas.put(player.getUniqueId(), waila);
-        } else {
-            waila = wailas.get(player.getUniqueId());
+    public static void setup() {
+        WAILAManager manager = getInstance();
+        Bukkit.getPluginManager().registerEvents(manager, SlimeHUD.getInstance());
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            manager.refreshPlayer(player);
         }
-        waila.setPaused(
-                !SlimeHUD.getInstance().getPlayerData().getBoolean(player.getUniqueId().toString() + ".waila", true));
     }
 
-    private void pauseWAILA(Player player) {
-        PlayerWAILA waila = wailas.get(player.getUniqueId());
-        if (waila != null)
-            waila.setPaused(true);
+    public static void shutdown() {
+        if (instance == null) {
+            return;
+        }
+        for (PlayerWAILA waila : instance.wailas.values()) {
+            waila.stop();
+        }
+        instance.wailas.clear();
+        instance = null;
+    }
+
+    public Map<UUID, PlayerWAILA> getWailas() {
+        return Collections.unmodifiableMap(wailas);
+    }
+
+    public PlayerWAILA getWaila(Player player) {
+        return wailas.get(player.getUniqueId());
+    }
+
+    public void refreshPlayer(Player player) {
+        if (SlimeHUD.getInstance().getConfig().getBoolean("waila.disabled", false) || isDisabledWorld(player)) {
+            PlayerWAILA existing = wailas.get(player.getUniqueId());
+            if (existing != null) {
+                existing.setPaused(true);
+            }
+            return;
+        }
+
+        PlayerWAILA waila = wailas.computeIfAbsent(player.getUniqueId(), ignored -> {
+            PlayerWAILA created = new PlayerWAILA(player);
+            created.start();
+            return created;
+        });
+
+        boolean enabled = SlimeHUD.getInstance().getPlayerData().getBoolean(player.getUniqueId() + ".waila", true);
+        waila.setPaused(!enabled);
+
+        String defaultDisplay = SlimeHUD.getInstance().getConfig().getString(
+                "waila.default-display",
+                SlimeHUD.getInstance().getConfig().getString("waila.location", "bossbar"));
+        String storedDisplay = SlimeHUD.getInstance().getPlayerData().getString(
+                player.getUniqueId() + ".display", defaultDisplay);
+        waila.setDisplayMode(DisplayMode.from(storedDisplay, DisplayMode.BOSSBAR));
+    }
+
+    public void reloadAll() {
+        for (PlayerWAILA waila : wailas.values()) {
+            waila.stop();
+        }
+        wailas.clear();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            refreshPlayer(player);
+        }
+    }
+
+    private boolean isDisabledWorld(Player player) {
+        return SlimeHUD.getInstance()
+                .getConfig()
+                .getStringList("waila.disabled-in")
+                .stream()
+                .anyMatch(world -> world.equalsIgnoreCase(player.getWorld().getName())
+                        || world.equalsIgnoreCase(player.getWorld().getKey().toString()));
     }
 
     private void removeWAILA(Player player) {
         PlayerWAILA waila = wailas.remove(player.getUniqueId());
-        if (waila != null)
-            waila.cancel();
-    }
-
-    @EventHandler
-    public void onPlayerJoin(@Nonnull PlayerJoinEvent e) {
-        Player player = e.getPlayer();
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.disabled", false) &&
-                !SlimeHUD.getInstance().getConfig().getList("waila.disabled-in", Collections.EMPTY_LIST)
-                        .contains(player.getWorld().getName())) {
-            generateWAILA(player);
+        if (waila != null) {
+            waila.stop();
         }
     }
 
     @EventHandler
-    public void onPlayerQuit(@Nonnull PlayerQuitEvent e) {
-        removeWAILA(e.getPlayer());
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
-    public void onPlayerChangeWorld(@Nonnull PlayerChangedWorldEvent e) {
-        Player player = e.getPlayer();
-        if (SlimeHUD.getInstance().getConfig().getList("waila.disabled-in", Collections.EMPTY_LIST)
-                .contains(player.getWorld().getName())) {
-            pauseWAILA(player);
-        } else {
-            generateWAILA(player);
-        }
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        removeWAILA(event.getPlayer());
     }
 
-    public static void setup() {
-        Bukkit.getPluginManager().registerEvents(getInstance(), SlimeHUD.getInstance());
+    @EventHandler
+    public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
+        refreshPlayer(event.getPlayer());
     }
-
 }
