@@ -1,36 +1,57 @@
-# SlimeHUD
+# SF_SlimeHUD 2.0.1
 
-Adds a WAILA (What Am I Looking At) HUD for Slimefun items. Can be set to display in the bossbar or above the hotbar in `config.yml`. Additional energy/cargo information can also be toggled on or off in `config.yml`. Individual players can also toggle their WAILA HUD with `/slimehud toggle`.
+A modernized SlimeHUD fork for **Slimefun Legacy** and Minecraft **1.21.11+** on Paper, Purpur, Leaf, and Folia.
 
-The HUD lets you see what Slimefun item a block is without breaking or opening its menu. It also displays additional information depending on the block, such as network size, cargo channel, and energy generation. See the [wiki](https://schn.pages.dev/slimehud) for more details.
+## What changed in 2.0.1
 
-## Preview
+- Removed the old InfinityLib bootstrap/runtime dependency.
+- Java 21 bytecode with compatibility builds on Java 21 and Java 25.
+- Folia-aware player polling through Paper's entity scheduler.
+- Automatic detection of every placed Slimefun/Slimefun Legacy block through Slimefun's registered block data.
+- Automatic vanilla block names without maintaining a hard-coded material list.
+- Dropped-item targeting for both vanilla stacks and registered Slimefun items.
+- WIT-inspired vanilla details for redstone, crops, beehives, furnaces, brewing stands, containers, beacons, spawners, note blocks, farmland, tool type, and more.
+- Preserves SlimeHUD machine progress, stored energy, cargo channel, cargo network, and energy network information.
+- Per-player persistent BossBar or ActionBar display choice.
+- PlaceholderAPI support.
 
-<https://user-images.githubusercontent.com/101147426/182007545-474a6596-b4e2-4a92-bdab-c18ed2286a94.mp4>
+## Player commands
 
-## PlaceholderAPI
+- `/slimehud toggle`
+- `/slimehud display bossbar`
+- `/slimehud display actionbar`
+- `/slimehud status`
 
-- `%slimehud_toggle%` Returns the current player's toggle state. Possible values are `true` or `false`.
-- `%slimehud_hud%` Standard hud, including block display name and additional information.
-- `%slimehud_hud_block%` Only block display names.
-- `%slimehud_hud_block_info%` Only additional information.
+Shortcuts: `/slimehud bossbar` and `/slimehud actionbar`.
 
-## Limitations
+Admin: `/slimehud reload`
 
-- Minecraft only has 7 colors for the bossbar, compared to 16 for regular items.
+## Output
 
-## API
+The Maven build produces exactly:
 
-API documentation can be found [here](https://schn.pages.dev/slimehud/api-usage) on the wiki.
+`SF_SlimeHUD2.0.1.jar`
 
-## Requirements
+## Compatibility target
 
-- Spigot or its derivatives
-- Slimefun, of course
+- Minecraft 1.21.11+
+- Paper
+- Purpur
+- Leaf
+- Folia
+- Slimefun Legacy
 
-## Credits
+The plugin intentionally uses public Bukkit/Paper and Slimefun APIs for generic block and dropped-item discovery. Newly registered Slimefun addon blocks/items and newly introduced vanilla materials therefore do not need to be added to a SlimeHUD item list.
 
-Big thanks to Sefiraat for designing and creating the API!
+## Compatibility validation
 
-*InfinityLib* by Mooy1  
-*Lombok* by Project Lombok
+`SF_SlimeHUD2.0.1.jar` is built once and runtime-smoked with the real **Slimefun Legacy 4.1.50** release. The smoke test requires the server to reach `Done`, Slimefun to enable, SlimeHUD to enable, no SlimeHUD runtime error during the smoke window, and a clean shutdown.
+
+| Minecraft | Paper | Purpur | Leaf | Folia |
+| --- | --- | --- | --- | --- |
+| 1.21.11 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.1.2 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.2 | Runtime PASS | Runtime PASS | Runtime PASS | Runtime PASS |
+| 26.3 pre-release | API compile PASS; runtime blocked by Slimefun Legacy 4.1.50 version gate | Not claimed | Not claimed | Not claimed |
+
+The 26.3 runtime result is intentionally classified separately. Paper 26.3 loads the server and discovers both plugins, but Slimefun Legacy 4.1.50 currently rejects Minecraft 26.3 before SlimeHUD can be runtime-validated. This is a Slimefun Legacy support-version gate, not an SF_SlimeHUD Paper-API compile failure. Once Slimefun Legacy allows 26.3, the advisory runtime smoke becomes the next compatibility gate automatically.

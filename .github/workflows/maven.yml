@@ -1,81 +1,66 @@
-name: Build SlimeHUD
+name: Build SF_SlimeHUD
 
 on:
   push:
-    branches: [master]
-    tags: ['v*']
-  pull_request:
-    branches: [master]
+    branches:
+      - master
+      - 'feature/**'
   workflow_dispatch:
 
 permissions:
-  contents: write
-
-env:
-  VERSION: "2.0.1"
-  OUTPUT_NAME: "SF_SlimeHUD2.0.1.jar"
+  contents: read
 
 jobs:
   build:
+    name: ${{ matrix.label }} / Java ${{ matrix.java }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Paper 1.21.11 baseline
+            java: 21
+            paper: 1.21.11-R0.1-SNAPSHOT
+            artifact: false
+          - label: Paper 1.21.11 on Java 25
+            java: 25
+            paper: 1.21.11-R0.1-SNAPSHOT
+            artifact: true
+          - label: Paper 26.1.2 stable API
+            java: 25
+            paper: 26.1.2.build.74-stable
+            artifact: false
+          - label: Paper 26.2 stable API
+            java: 25
+            paper: 26.2.build.123-stable
+            artifact: false
+          - label: Paper 26.3 current pre-release API
+            java: 25
+            paper: 26.3-rc-3.build.1-alpha
+            artifact: false
+
     steps:
-      - uses: actions/checkout@v6
-      - name: Set up Java 25
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
           cache: maven
-      - name: Verify canonical release identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]
-          test "$OUTPUT_NAME" = "SF_SlimeHUD${VERSION}.jar"
-          test "$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" = "$VERSION"
-          grep -Fq '<finalName>SF_SlimeHUD${project.version}</finalName>' pom.xml
-      - name: Verify Paper 1.21.11 baseline compilation
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean package
-      - name: Verify Paper 26.2 compilation
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Dpaper.version=26.2.build.+ clean package
-      - name: Verify Paper 26.3 alpha compilation
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Dpaper.version=26.3-rc-3.build.1-alpha clean package
-      - name: Build Java 21 universal release JAR
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean package
-      - name: Verify and stage canonical JAR
-        shell: bash
-        run: |
-          set -euo pipefail
-          JAR="target/${OUTPUT_NAME}"
-          test -s "$JAR"
-          PLUGIN_VERSION=$(unzip -p "$JAR" plugin.yml | awk -F': *' '/^version:/ {gsub(/["'"'"']/,"",$2); print $2; exit}')
-          test "$PLUGIN_VERSION" = "$VERSION"
-          if printf '%s\n' "$PLUGIN_VERSION" | grep -Eiq '(legacy|english|snapshot)'; then exit 1; fi
-          mkdir -p dist
-          cp "$JAR" "dist/${OUTPUT_NAME}"
-          sha256sum "dist/${OUTPUT_NAME}"
-      - name: Upload canonical raw JAR artifact
+
+      - name: Build against ${{ matrix.paper }}
+        run: mvn -B -ntp -Dpaper.version="${{ matrix.paper }}" clean package
+
+      - name: Verify drop-in filename
+        run: test -s target/SF_SlimeHUD2.0.1.jar
+
+      - name: Upload raw JAR
+        if: matrix.artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.OUTPUT_NAME }}
-          path: dist/${{ env.OUTPUT_NAME }}
+          name: SF_SlimeHUD2.0.1.jar
+          path: target/SF_SlimeHUD2.0.1.jar
           archive: false
           if-no-files-found: error
-      - name: Publish canonical raw JAR release asset
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || github.ref_name == github.event.repository.default_branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then TAG="$GITHUB_REF_NAME"; else TAG="v${VERSION}"; fi
-          JAR="dist/${OUTPUT_NAME}"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            while IFS= read -r OLD; do
-              if [[ "$OLD" == *.jar && "$OLD" != "$OUTPUT_NAME" ]]; then gh release delete-asset "$TAG" "$OLD" --repo "$GITHUB_REPOSITORY" -y; fi
-            done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
-            gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
-          else
-            gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "SF_SlimeHUD ${VERSION}" --notes "SlimeHUD ${VERSION}: Slimefun Legacy compatibility release."
-          fi
