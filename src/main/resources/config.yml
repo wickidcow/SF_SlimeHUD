@@ -15,7 +15,7 @@ waila:
   # Legacy compatibility: old configs used bossbar/hotbar here.
   location: bossbar
 
-  # How far players can inspect blocks.
+  # How far players can inspect blocks and dropped items.
   max-distance: 8
 
   # Update interval in ticks. WIT uses a fast polling model; 5 ticks keeps the
@@ -35,6 +35,15 @@ waila:
   show-energy-stored: true
   show-machine-progress: true
   show-generator-generation: true
+
+items:
+  # Looking directly at a dropped item can identify vanilla and registered
+  # Slimefun item stacks. This uses the same ray trace as block targeting.
+  enabled: true
+  show-stack-size: true
+
+  # Useful for admins/debugging, but kept off for normal players by default.
+  show-slimefun-id: false
 
 vanilla:
   # Generic vanilla block support is automatic; new Materials do not need to be
