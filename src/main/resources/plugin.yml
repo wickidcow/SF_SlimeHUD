@@ -3,7 +3,9 @@ version: ${project.version}
 main: io.github.schntgaispock.slimehud.SlimeHUD
 api-version: '1.21'
 folia-supported: true
-author: wickidcow
+authors:
+  - SchnTgaiSpock
+  - wickidcow
 description: Slimefun Legacy + vanilla WAILA HUD with per-player BossBar or ActionBar display.
 website: https://github.com/wickidcow/SF_SlimeHUD
 
