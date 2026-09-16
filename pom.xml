@@ -11,7 +11,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
-        <slimefun.version>4.1.50</slimefun.version>
+        <slimefun.api.version>RC-37</slimefun.api.version>
     </properties>
 
     <repositories>
@@ -20,8 +20,8 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>norain-releases</id>
-            <url>https://maven.norain.city/releases</url>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
         <repository>
             <id>placeholderapi</id>
@@ -37,10 +37,16 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.slimefun</groupId>
-            <artifactId>Slimefun</artifactId>
-            <version>${slimefun.version}</version>
+            <groupId>com.github.Slimefun</groupId>
+            <artifactId>Slimefun4</artifactId>
+            <version>${slimefun.api.version}</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.github.baked-libs</groupId>
+                    <artifactId>dough-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>me.clip</groupId>
