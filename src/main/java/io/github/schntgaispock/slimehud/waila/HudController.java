@@ -173,6 +173,17 @@ public final class HudController {
     }
 
     private boolean config(String path) {
-        return SlimeHUD.getInstance().getConfig().getBoolean(path, true);
+        var config = SlimeHUD.getInstance().getConfig();
+        if (config.contains(path)) {
+            return config.getBoolean(path);
+        }
+
+        if (path.startsWith("waila.slimefun.")) {
+            String legacyPath = "waila." + path.substring("waila.slimefun.".length());
+            if (config.contains(legacyPath)) {
+                return config.getBoolean(legacyPath);
+            }
+        }
+        return true;
     }
 }
