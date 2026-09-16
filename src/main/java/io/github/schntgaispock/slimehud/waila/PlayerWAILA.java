@@ -9,11 +9,14 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.util.RayTraceResult;
 
 public final class PlayerWAILA {
 
@@ -87,7 +90,32 @@ public final class PlayerWAILA {
 
     private void updateFacing() {
         int maxDistance = Math.max(1, SlimeHUD.getInstance().getConfig().getInt("waila.max-distance", 8));
-        Block targetBlock = player.getTargetBlockExact(maxDistance);
+        boolean showItems = SlimeHUD.getInstance().getConfig().getBoolean("items.enabled", true);
+
+        RayTraceResult trace = player.getWorld().rayTrace(
+                player.getEyeLocation(),
+                player.getEyeLocation().getDirection(),
+                maxDistance,
+                FluidCollisionMode.NEVER,
+                true,
+                0.2D,
+                entity -> showItems && entity instanceof Item);
+
+        if (trace == null) {
+            clearFacing();
+            return;
+        }
+
+        if (trace.getHitEntity() instanceof Item droppedItem) {
+            ItemInfoProvider.ItemHud itemHud = ItemInfoProvider.describe(
+                    player, droppedItem.getItemStack(), SlimeHUD.getInstance().getConfig());
+            facingBlock = itemHud.name();
+            facingBlockInfo = itemHud.info();
+            buildFacingText();
+            return;
+        }
+
+        Block targetBlock = trace.getHitBlock();
         if (targetBlock == null || targetBlock.getType().isAir()) {
             clearFacing();
             return;
@@ -107,6 +135,10 @@ public final class PlayerWAILA {
             return;
         }
 
+        buildFacingText();
+    }
+
+    private void buildFacingText() {
         facing = ChatColor.translateAlternateColorCodes(
                 '&', facingBlock + (facingBlockInfo.isEmpty() ? "" : " &7| " + facingBlockInfo));
     }
