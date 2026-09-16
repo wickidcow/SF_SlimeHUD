@@ -216,6 +216,17 @@ if [[ "$EXPECTATION" == "slimefun-version-gate" ]]; then
         cat "$CONSOLE_LOG" >&2 || true
         exit 1
     fi
+    if grep -Fq 'Error occurred while enabling SlimeHUD' "$CONSOLE_LOG" || \
+       grep -Fq 'NoClassDefFoundError: io/github/thebusybiscuit/slimefun4' "$CONSOLE_LOG"; then
+        echo "${FAMILY} ${MC_VERSION}: Slimefun version gate was expected, but SlimeHUD did not fail gracefully." >&2
+        cat "$CONSOLE_LOG" >&2 || true
+        exit 1
+    fi
+    if ! grep -Fq 'Slimefun is unavailable or disabled. SF_SlimeHUD cannot start without its required dependency.' "$CONSOLE_LOG"; then
+        echo "${FAMILY} ${MC_VERSION}: expected SlimeHUD dependency-guard message was not observed." >&2
+        cat "$CONSOLE_LOG" >&2 || true
+        exit 1
+    fi
 
     cat > "$WORK_DIR/smoke-result.txt" <<EOF_RESULT
 SF_SlimeHUD runtime smoke: BLOCKED_BY_SLIMEFUN_VERSION_GATE
@@ -227,6 +238,7 @@ Slimefun Legacy: ${SLIMEFUN_VERSION}
 SF_SlimeHUD: 2.0.1
 Server reached Done: yes
 Slimefun enabled: no
+SlimeHUD dependency handling: graceful disable observed
 Reason: Slimefun Legacy ${SLIMEFUN_VERSION} rejects Minecraft ${MC_VERSION} before SF_SlimeHUD can be runtime-validated.
 SF_SlimeHUD API compile: covered separately by the Paper ${MC_VERSION} compile target.
 Addon runtime verdict: not tested because the required dependency disabled itself first.
