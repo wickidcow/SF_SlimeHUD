@@ -1,6 +1,7 @@
 package io.github.schntgaispock.slimehud.waila;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
+import io.github.schntgaispock.slimehud.integration.WITIntegration;
 import io.github.schntgaispock.slimehud.util.Util;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -37,6 +38,8 @@ public final class PlayerWAILA {
     private String facing = "";
     private String facingBlock = "";
     private String facingBlockInfo = "";
+    private volatile Integer maxDistanceOverride;
+    private volatile Boolean vanillaEnabledOverride;
 
     public PlayerWAILA(Player player) {
         this.player = player;
@@ -97,8 +100,15 @@ public final class PlayerWAILA {
             return;
         }
 
+        if (WITIntegration.shouldDelegate(player)) {
+            requestSequence.incrementAndGet();
+            clearFacing();
+            clearDisplay();
+            return;
+        }
+
         long sequence = requestSequence.incrementAndGet();
-        int maxDistance = Math.max(1, SlimeHUD.getInstance().getConfig().getInt("waila.max-distance", 8));
+        int maxDistance = getEffectiveMaxDistance();
         boolean showItems = SlimeHUD.getInstance().getConfig().getBoolean("items.enabled", true);
 
         Location eye = player.getEyeLocation();
@@ -131,6 +141,19 @@ public final class PlayerWAILA {
         inspectBlock(sequence, hitBlock.getLocation(), heldItem);
     }
 
+    private int getEffectiveMaxDistance() {
+        Integer override = maxDistanceOverride;
+        int configured = SlimeHUD.getInstance().getConfig().getInt("waila.max-distance", 8);
+        return Math.max(1, override == null ? configured : override);
+    }
+
+    private boolean isVanillaEnabled() {
+        Boolean override = vanillaEnabledOverride;
+        return override == null
+                ? SlimeHUD.getInstance().getConfig().getBoolean("vanilla.enabled", true)
+                : override;
+    }
+
     private void inspectItem(long sequence, Item droppedItem) {
         droppedItem.getScheduler().run(
                 SlimeHUD.getInstance(),
@@ -160,7 +183,7 @@ public final class PlayerWAILA {
                 return;
             }
 
-            if (SlimeHUD.getInstance().getConfig().getBoolean("vanilla.enabled", true)) {
+            if (isVanillaEnabled()) {
                 String name = "&f" + VanillaInfoProvider.getName(targetBlock);
                 String info = VanillaInfoProvider.getInfo(
                         targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
@@ -303,5 +326,37 @@ public final class PlayerWAILA {
         }
         clearDisplay();
         this.displayMode = displayMode;
+    }
+
+    /**
+     * Applies an optional per-player range override supplied by another addon,
+     * such as JustEnoughGuide. Pass null to return to config.yml.
+     */
+    public void setMaxDistanceOverride(Integer maxDistance) {
+        this.maxDistanceOverride = maxDistance == null ? null : Math.max(1, maxDistance);
+        requestSequence.incrementAndGet();
+    }
+
+    public Integer getMaxDistanceOverride() {
+        return maxDistanceOverride;
+    }
+
+    /**
+     * Applies an optional per-player vanilla-block override supplied by another
+     * addon. Pass null to return to config.yml.
+     */
+    public void setVanillaEnabledOverride(Boolean enabled) {
+        this.vanillaEnabledOverride = enabled;
+        requestSequence.incrementAndGet();
+    }
+
+    public Boolean getVanillaEnabledOverride() {
+        return vanillaEnabledOverride;
+    }
+
+    public void clearExternalOverrides() {
+        maxDistanceOverride = null;
+        vanillaEnabledOverride = null;
+        requestSequence.incrementAndGet();
     }
 }
