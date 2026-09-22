@@ -40,14 +40,17 @@ public final class VanillaInfoProvider {
     }
 
     public static String getName(Block block, FileConfiguration config) {
-        String name = getName(block);
+        return getName(block) + getToolSymbolSuffix(block, config);
+    }
+
+    public static String getToolSymbolSuffix(Block block, FileConfiguration config) {
         if (!config.getBoolean("vanilla.show-tool-symbol", true)) {
-            return name;
+            return "";
         }
 
         ToolHint hint = preferredTool(block.getType());
         if (hint == null) {
-            return name;
+            return "";
         }
 
         String defaultSymbol = switch (hint.key()) {
@@ -60,10 +63,34 @@ public final class VanillaInfoProvider {
         };
         String symbol = config.getString("vanilla.tool-symbols." + hint.key(), defaultSymbol);
         if (symbol == null || symbol.isBlank()) {
-            return name;
+            return "";
         }
 
-        return name + " &8[&f" + symbol + "&8]";
+        return " &8[&f" + symbol + "&8]";
+    }
+
+    public static String getToolInfo(Block block, ItemStack heldItem, FileConfiguration config) {
+        if (!config.getBoolean("vanilla.show-tool", true)) {
+            return "";
+        }
+
+        ToolHint hint = preferredTool(block.getType());
+        if (hint == null) {
+            return "";
+        }
+
+        String tool = hint.label();
+        if (heldItem != null && !heldItem.getType().isAir()) {
+            tool += isCorrectHeldTool(block, heldItem) ? " (held ✓)" : " (held ✗)";
+        }
+        return "Tool: " + tool;
+    }
+
+    public static boolean isContainmentSpawner(SlimefunItem slimefunItem, Block block) {
+        if (block.getType() != Material.SPAWNER) {
+            return false;
+        }
+        return slimefunItem == null || "REPAIRED_SPAWNER".equals(slimefunItem.getId());
     }
 
     public static String getInfo(Block block, ItemStack heldItem, FileConfiguration config) {
@@ -161,15 +188,9 @@ public final class VanillaInfoProvider {
             }
         }
 
-        if (config.getBoolean("vanilla.show-tool", true)) {
-            ToolHint hint = preferredTool(block.getType());
-            if (hint != null) {
-                String tool = hint.label();
-                if (heldItem != null && !heldItem.getType().isAir()) {
-                    tool += isCorrectHeldTool(block, heldItem) ? " (held ✓)" : " (held ✗)";
-                }
-                parts.add("Tool: " + tool);
-            }
+        String toolInfo = getToolInfo(block, heldItem, config);
+        if (!toolInfo.isEmpty()) {
+            parts.add(toolInfo);
         }
 
         return String.join(" &8| &7", parts);
