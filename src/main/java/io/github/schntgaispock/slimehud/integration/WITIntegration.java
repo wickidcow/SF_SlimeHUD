@@ -2,7 +2,9 @@ package io.github.schntgaispock.slimehud.integration;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.waila.HudRequest;
+import io.github.schntgaispock.slimehud.waila.PlayerWAILA;
 import io.github.schntgaispock.slimehud.waila.VanillaInfoProvider;
+import io.github.schntgaispock.slimehud.waila.WAILAManager;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -211,7 +213,7 @@ public final class WITIntegration implements Listener {
             }
 
             if (!plugin.getConfig().getBoolean("integrations.what-is-that.use-slimehud-vanilla", true)
-                    || !plugin.getConfig().getBoolean("vanilla.enabled", true)
+                    || !isVanillaEnabledFor(player)
                     || !witAllowsVanillaBlock(block)) {
                 return false;
             }
@@ -234,6 +236,14 @@ public final class WITIntegration implements Listener {
             infoAddSuffix.invoke(witInfo, legacyComponent(info));
         }
         apiUpdateBar.invoke(null, witInfo, player);
+    }
+
+    private boolean isVanillaEnabledFor(Player player) {
+        PlayerWAILA waila = WAILAManager.getInstance().getWaila(player);
+        if (waila != null && waila.getVanillaEnabledOverride() != null) {
+            return waila.getVanillaEnabledOverride();
+        }
+        return plugin.getConfig().getBoolean("vanilla.enabled", true);
     }
 
     private boolean witAllowsVanillaBlock(Block block) {
