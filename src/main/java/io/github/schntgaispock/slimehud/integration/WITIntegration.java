@@ -208,6 +208,16 @@ public final class WITIntegration implements Listener {
                 HudRequest request = new HudRequest(item, block.getLocation(), player);
                 String name = SlimeHUD.getTranslationManager().getItemName(item);
                 String info = SlimeHUD.getHudController().processRequest(request);
+
+                if (VanillaInfoProvider.isContainmentSpawner(item, block)) {
+                    name += VanillaInfoProvider.getToolSymbolSuffix(block, plugin.getConfig());
+                    String toolInfo = VanillaInfoProvider.getToolInfo(
+                            block, player.getInventory().getItemInMainHand().clone(), plugin.getConfig());
+                    if (!toolInfo.isEmpty()) {
+                        info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
+                    }
+                }
+
                 updateWitBar(name, info, player);
                 return true;
             }
