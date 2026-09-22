@@ -1,5 +1,6 @@
 package io.github.schntgaispock.slimehud.waila;
 
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,10 +29,41 @@ import org.bukkit.potion.PotionEffect;
 
 public final class VanillaInfoProvider {
 
+    private static final String PICKAXE_OF_CONTAINMENT_ID = "PICKAXE_OF_CONTAINMENT";
+
     private VanillaInfoProvider() {}
+
+    private record ToolHint(String key, String label) {}
 
     public static String getName(Block block) {
         return humanize(block.getType().name());
+    }
+
+    public static String getName(Block block, FileConfiguration config) {
+        String name = getName(block);
+        if (!config.getBoolean("vanilla.show-tool-symbol", true)) {
+            return name;
+        }
+
+        ToolHint hint = preferredTool(block.getType());
+        if (hint == null) {
+            return name;
+        }
+
+        String defaultSymbol = switch (hint.key()) {
+            case "pickaxe" -> "⛏";
+            case "axe" -> "🪓";
+            case "shovel" -> "🪏";
+            case "hoe" -> "⚒";
+            case "containment" -> "⛏";
+            default -> "";
+        };
+        String symbol = config.getString("vanilla.tool-symbols." + hint.key(), defaultSymbol);
+        if (symbol == null || symbol.isBlank()) {
+            return name;
+        }
+
+        return name + " &8[&f" + symbol + "&8]";
     }
 
     public static String getInfo(Block block, ItemStack heldItem, FileConfiguration config) {
@@ -130,10 +162,11 @@ public final class VanillaInfoProvider {
         }
 
         if (config.getBoolean("vanilla.show-tool", true)) {
-            String tool = preferredTool(block.getType());
-            if (!tool.isEmpty()) {
+            ToolHint hint = preferredTool(block.getType());
+            if (hint != null) {
+                String tool = hint.label();
                 if (heldItem != null && !heldItem.getType().isAir()) {
-                    tool += block.isPreferredTool(heldItem) ? " (held ✓)" : " (held ✗)";
+                    tool += isCorrectHeldTool(block, heldItem) ? " (held ✓)" : " (held ✗)";
                 }
                 parts.add("Tool: " + tool);
             }
@@ -142,30 +175,45 @@ public final class VanillaInfoProvider {
         return String.join(" &8| &7", parts);
     }
 
-    private static String preferredTool(Material material) {
-        String tool;
+    private static ToolHint preferredTool(Material material) {
+        if (material == Material.SPAWNER) {
+            return new ToolHint("containment", "Pickaxe of Containment");
+        }
+
+        String key;
+        String label;
         if (Tag.MINEABLE_PICKAXE.isTagged(material)) {
-            tool = "Pickaxe";
+            key = "pickaxe";
+            label = "Pickaxe";
         } else if (Tag.MINEABLE_AXE.isTagged(material)) {
-            tool = "Axe";
+            key = "axe";
+            label = "Axe";
         } else if (Tag.MINEABLE_SHOVEL.isTagged(material)) {
-            tool = "Shovel";
+            key = "shovel";
+            label = "Shovel";
         } else if (Tag.MINEABLE_HOE.isTagged(material)) {
-            tool = "Hoe";
+            key = "hoe";
+            label = "Hoe";
         } else {
-            return "";
+            return null;
         }
 
         if (Tag.NEEDS_DIAMOND_TOOL.isTagged(material)) {
-            return tool + " (Diamond+)";
+            label += " (Diamond+)";
+        } else if (Tag.NEEDS_IRON_TOOL.isTagged(material)) {
+            label += " (Iron+)";
+        } else if (Tag.NEEDS_STONE_TOOL.isTagged(material)) {
+            label += " (Stone+)";
         }
-        if (Tag.NEEDS_IRON_TOOL.isTagged(material)) {
-            return tool + " (Iron+)";
+        return new ToolHint(key, label);
+    }
+
+    private static boolean isCorrectHeldTool(Block block, ItemStack heldItem) {
+        if (block.getType() == Material.SPAWNER) {
+            SlimefunItem slimefunItem = SlimefunItem.getByItem(heldItem);
+            return slimefunItem != null && PICKAXE_OF_CONTAINMENT_ID.equals(slimefunItem.getId());
         }
-        if (Tag.NEEDS_STONE_TOOL.isTagged(material)) {
-            return tool + " (Stone+)";
-        }
-        return tool;
+        return block.isPreferredTool(heldItem);
     }
 
     private static String humanize(String value) {
