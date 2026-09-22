@@ -140,12 +140,12 @@ jobs:
             advisory: false
             expectation: supported
 
-          - label: Paper 26.3 / Java 25
+          - label: Paper 26.3 candidate / Java 25
             family: paper
             minecraft: 26.3
             channel: ANY
             java: 25
-            advisory: false
+            advisory: true
             expectation: supported
 
     steps:
