@@ -188,7 +188,7 @@ public final class WITIntegration implements Listener {
     }
 
     private boolean handleBlock(Block block, Player player) {
-        if (!hooked || !integrationEnabled()) {
+        if (!hooked || !integrationEnabled() || !isSlimeHudEnabledFor(player)) {
             return false;
         }
 
@@ -221,7 +221,8 @@ public final class WITIntegration implements Listener {
     }
 
     private boolean shouldDelegateInternal(Player player) {
-        if (!hooked || !integrationEnabled() || witPlugin == null || !witPlugin.isEnabled()) {
+        if (!hooked || !integrationEnabled() || !isSlimeHudEnabledFor(player)
+                || witPlugin == null || !witPlugin.isEnabled()) {
             return false;
         }
 
@@ -245,6 +246,23 @@ public final class WITIntegration implements Listener {
             // can never leave the player without a HUD.
             return false;
         }
+    }
+
+    private boolean isSlimeHudEnabledFor(Player player) {
+        if (plugin.getConfig().getBoolean("waila.disabled", false)) {
+            return false;
+        }
+
+        boolean disabledWorld = plugin.getConfig()
+                .getStringList("waila.disabled-in")
+                .stream()
+                .anyMatch(world -> world.equalsIgnoreCase(player.getWorld().getName())
+                        || world.equalsIgnoreCase(player.getWorld().getKey().toString()));
+        if (disabledWorld) {
+            return false;
+        }
+
+        return plugin.getPlayerData().getBoolean(player.getUniqueId() + ".waila", true);
     }
 
     private void unhook() {
