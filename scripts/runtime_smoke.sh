@@ -10,7 +10,7 @@ EXPECTATION="${6:-supported}"
 
 SLIMEFUN_VERSION="${SLIMEFUN_VERSION:-4.1.59}"
 SLIMEFUN_URL="${SLIMEFUN_URL:-https://github.com/wickidcow/Slimefun-Legacy/releases/download/v${SLIMEFUN_VERSION}/Slimefun-Legacy${SLIMEFUN_VERSION}.jar}"
-USER_AGENT="${RUNTIME_SMOKE_USER_AGENT:-SF_SlimeHUD-CI/2.0.1 (https://github.com/wickidcow/SF_SlimeHUD)}"
+USER_AGENT="${RUNTIME_SMOKE_USER_AGENT:-SF_SlimeHUD-CI/2.0.2 (https://github.com/wickidcow/SF_SlimeHUD)}"
 STARTUP_TIMEOUT_SECONDS="${RUNTIME_SMOKE_STARTUP_TIMEOUT:-300}"
 SHUTDOWN_TIMEOUT_SECONDS="${RUNTIME_SMOKE_SHUTDOWN_TIMEOUT:-60}"
 
@@ -49,7 +49,7 @@ curl --fail-with-body -L -sS -H "User-Agent: ${USER_AGENT}" \
     -o "$WORK_DIR/plugins/Slimefun-Legacy${SLIMEFUN_VERSION}.jar" \
     "$SLIMEFUN_URL"
 test -s "$WORK_DIR/plugins/Slimefun-Legacy${SLIMEFUN_VERSION}.jar"
-cp "$ADDON_JAR" "$WORK_DIR/plugins/SF_SlimeHUD2.0.1.jar"
+cp "$ADDON_JAR" "$WORK_DIR/plugins/SF_SlimeHUD2.0.2.jar"
 
 SERVER_URL=""
 SERVER_BUILD=""
@@ -135,7 +135,7 @@ Channel: ${SERVER_CHANNEL}
 Download: ${SERVER_URL}
 Java: $(java -version 2>&1 | head -n 1)
 Slimefun Legacy: ${SLIMEFUN_VERSION}
-Addon: SF_SlimeHUD 2.0.1
+Addon: SF_SlimeHUD 2.0.2
 Expectation: ${EXPECTATION}
 EOF_BUILD
 
@@ -235,7 +235,7 @@ Minecraft: ${MC_VERSION}
 Build: ${SERVER_BUILD}
 Channel: ${SERVER_CHANNEL}
 Slimefun Legacy: ${SLIMEFUN_VERSION}
-SF_SlimeHUD: 2.0.1
+SF_SlimeHUD: 2.0.2
 Server reached Done: yes
 Slimefun enabled: no
 SlimeHUD dependency handling: graceful disable observed
@@ -259,8 +259,8 @@ if ! grep -Fq "Enabling Slimefun v${SLIMEFUN_VERSION}" "$CONSOLE_LOG"; then
     cat "$CONSOLE_LOG" >&2 || true
     exit 1
 fi
-if ! grep -Fq 'Enabling SlimeHUD v2.0.1' "$CONSOLE_LOG"; then
-    echo "${FAMILY} ${MC_VERSION}: SlimeHUD 2.0.1 enable line was not observed." >&2
+if ! grep -Fq 'Enabling SlimeHUD v2.0.2' "$CONSOLE_LOG"; then
+    echo "${FAMILY} ${MC_VERSION}: SlimeHUD 2.0.2 enable line was not observed." >&2
     cat "$CONSOLE_LOG" >&2 || true
     exit 1
 fi
@@ -288,7 +288,7 @@ Minecraft: ${MC_VERSION}
 Build: ${SERVER_BUILD}
 Channel: ${SERVER_CHANNEL}
 Slimefun Legacy: ${SLIMEFUN_VERSION}
-SF_SlimeHUD: 2.0.1
+SF_SlimeHUD: 2.0.2
 Server reached Done: yes
 Slimefun enabled: yes
 SlimeHUD enabled: yes
