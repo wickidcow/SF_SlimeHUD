@@ -8,7 +8,7 @@ ADDON_JAR="${4:?Usage: runtime_smoke.sh <paper|purpur|leaf|folia> <minecraft-ver
 WORK_DIR="${5:-build/runtime-smoke-${FAMILY}-${MC_VERSION}}"
 EXPECTATION="${6:-supported}"
 
-SLIMEFUN_VERSION="${SLIMEFUN_VERSION:-4.1.50}"
+SLIMEFUN_VERSION="${SLIMEFUN_VERSION:-4.1.59}"
 SLIMEFUN_URL="${SLIMEFUN_URL:-https://github.com/wickidcow/Slimefun-Legacy/releases/download/v${SLIMEFUN_VERSION}/Slimefun-Legacy${SLIMEFUN_VERSION}.jar}"
 USER_AGENT="${RUNTIME_SMOKE_USER_AGENT:-SF_SlimeHUD-CI/2.0.1 (https://github.com/wickidcow/SF_SlimeHUD)}"
 STARTUP_TIMEOUT_SECONDS="${RUNTIME_SMOKE_STARTUP_TIMEOUT:-300}"
