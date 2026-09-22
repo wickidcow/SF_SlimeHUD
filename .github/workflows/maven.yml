@@ -32,11 +32,11 @@ jobs:
             artifact: false
           - label: Paper 26.2 stable API
             java: 25
-            paper: 26.2.build.123-stable
+            paper: 26.2.build.124-stable
             artifact: false
           - label: Paper 26.3 current pre-release API
             java: 25
-            paper: 26.3-rc-3.build.1-alpha
+            paper: 26.3.build.32-alpha
             artifact: false
 
     steps:
@@ -54,14 +54,14 @@ jobs:
         run: mvn -B -ntp -Dpaper.version="${{ matrix.paper }}" clean package
 
       - name: Verify drop-in filename
-        run: test -s target/SF_SlimeHUD2.0.1.jar
+        run: test -s target/SF_SlimeHUD2.0.2.jar
 
       - name: Upload raw JAR
         if: matrix.artifact
         uses: actions/upload-artifact@v7
         with:
-          name: SF_SlimeHUD2.0.1.jar
-          path: target/SF_SlimeHUD2.0.1.jar
+          name: SF_SlimeHUD2.0.2.jar
+          path: target/SF_SlimeHUD2.0.2.jar
           archive: false
           if-no-files-found: error
 
@@ -72,17 +72,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG='v2.0.1'
-          JAR='target/SF_SlimeHUD2.0.1.jar'
+          TAG='v2.0.2'
+          JAR='target/SF_SlimeHUD2.0.2.jar'
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             while IFS= read -r OLD; do
-              if [[ "$OLD" == *.jar && "$OLD" != 'SF_SlimeHUD2.0.1.jar' ]]; then
+              if [[ "$OLD" == *.jar && "$OLD" != 'SF_SlimeHUD2.0.2.jar' ]]; then
                 gh release delete-asset "$TAG" "$OLD" --repo "$GITHUB_REPOSITORY" -y
               fi
             done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
             gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'SF_SlimeHUD 2.0.1' \
-              --notes 'SF_SlimeHUD 2.0.1: Slimefun Legacy + WIT-style HUD modernization for Minecraft 1.21.11 through 26.3 compatibility.'
+              --title 'SF_SlimeHUD 2.0.2' \
+              --notes 'SF_SlimeHUD 2.0.2: Slimefun Legacy HUD repair with native JEG cooperation and optional What Is That integration for Minecraft 1.21.11 through 26.3.'
           fi
