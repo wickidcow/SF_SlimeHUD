@@ -7,7 +7,8 @@ A modernized SlimeHUD fork for **Slimefun Legacy** and Minecraft **1.21.11+** on
 - Adds a compact preferred-tool symbol beside **vanilla block names**.
 - Tool symbols are shown only for vanilla blocks handled by the vanilla provider.
 - Normal Slimefun blocks/items never receive a vanilla tool symbol.
-- Vanilla **Spawner** blocks are treated specially and report **Pickaxe of Containment** rather than a normal pickaxe.
+- Vanilla **Spawner** blocks and Slimefun **RepairedSpawner** are treated specially and report **Pickaxe of Containment** rather than a normal pickaxe.
+- Addon spawner machines remain excluded, matching Slimefun Legacy's actual Pickaxe of Containment behavior.
 - The held-tool check recognizes the actual Slimefun `PICKAXE_OF_CONTAINMENT` item for spawners.
 - Symbols are configurable in `config.yml`, so servers with custom fonts/resource packs can replace the defaults.
 - When What Is That? owns the visible HUD, SF_SlimeHUD can now provide the same vanilla block information through the WIT bridge while still respecting WIT's block enabled/blacklist rules.
@@ -24,7 +25,7 @@ Example native display:
 
 `Stone [⛏] | Tool: Pickaxe`
 
-`Spawner [⛏] | Spawner: Zombie | Tool: Pickaxe of Containment`
+`Spawner [⛏] | Spawner: Zombie | Tool: Pickaxe of Containment`\n\nThe same containment marker is allowed for a Slimefun RepairedSpawner, but not for addon spawner machines.
 
 The symbols are controlled by:
 
