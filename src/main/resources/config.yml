@@ -75,8 +75,9 @@ vanilla:
   show-farmland: true
 
   # Show a compact preferred-tool marker beside vanilla block names.
-  # Slimefun blocks do not receive these markers. Vanilla spawners are special:
-  # their tool is Pickaxe of Containment rather than a normal vanilla pickaxe.
+  # Slimefun blocks do not receive these markers, except RepairedSpawner.
+  # Vanilla and repaired spawners show Pickaxe of Containment. Addon spawner
+  # machines remain excluded, matching Slimefun's actual containment rules.
   show-tool-symbol: true
   tool-symbols:
     pickaxe: "⛏"
