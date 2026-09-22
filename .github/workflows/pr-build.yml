@@ -31,11 +31,11 @@ jobs:
             artifact: false
           - label: Paper 26.2 stable API
             java: 25
-            paper: 26.2.build.123-stable
+            paper: 26.2.build.124-stable
             artifact: false
           - label: Paper 26.3 current pre-release API
             java: 25
-            paper: 26.3-rc-3.build.1-alpha
+            paper: 26.3.build.32-alpha
             artifact: false
 
     steps:
@@ -53,13 +53,13 @@ jobs:
         run: mvn -B -ntp -Dpaper.version="${{ matrix.paper }}" clean package
 
       - name: Verify drop-in filename
-        run: test -s target/SF_SlimeHUD2.0.1.jar
+        run: test -s target/SF_SlimeHUD2.0.2.jar
 
       - name: Upload raw JAR
         if: matrix.artifact
         uses: actions/upload-artifact@v7
         with:
-          name: SF_SlimeHUD2.0.1.jar
-          path: target/SF_SlimeHUD2.0.1.jar
+          name: SF_SlimeHUD2.0.2.jar
+          path: target/SF_SlimeHUD2.0.2.jar
           archive: false
           if-no-files-found: error

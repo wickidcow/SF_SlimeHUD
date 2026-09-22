@@ -1,11 +1,11 @@
 package io.github.schntgaispock.slimehud.command;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
+import io.github.schntgaispock.slimehud.integration.WITIntegration;
 import io.github.schntgaispock.slimehud.waila.DisplayMode;
 import io.github.schntgaispock.slimehud.waila.PlayerWAILA;
 import io.github.schntgaispock.slimehud.waila.WAILAManager;
 import java.util.UUID;
-import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -21,6 +21,7 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
                 return true;
             }
             SlimeHUD.getInstance().reloadConfig();
+            WITIntegration.refresh();
             WAILAManager.getInstance().reloadAll();
             sender.sendMessage("§a§lSlimeHUD§7> §aConfiguration reloaded.");
             return true;
@@ -104,6 +105,9 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
 
         String pretty = mode == DisplayMode.BOSSBAR ? "BossBar" : "ActionBar";
         player.sendMessage("§a§lSlimeHUD§7> Display set to §f" + pretty + "§7.");
+        if (WITIntegration.shouldDelegate(player)) {
+            player.sendMessage("§a§lSlimeHUD§7> §7WIT currently owns the visible HUD; use WIT's display setting while its bridge is active.");
+        }
         return true;
     }
 
@@ -118,6 +122,9 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
 
         player.sendMessage("§a§lSlimeHUD§7> HUD: " + (enabled ? "§aenabled" : "§cdisabled")
                 + "§7, display: §f" + mode.id() + "§7.");
+        player.sendMessage("§a§lSlimeHUD§7> WIT bridge: "
+                + (WITIntegration.shouldDelegate(player) ? "§aactive §7(WIT owns display)" :
+                WITIntegration.isHooked() ? "§eavailable §7(SlimeHUD currently owns display)" : "§8not active"));
         return true;
     }
 
@@ -129,7 +136,7 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
                 "§f/slimehud toggle §7- enable/disable your HUD",
                 "§f/slimehud display bossbar §7- use BossBar",
                 "§f/slimehud display actionbar §7- use ActionBar",
-                "§f/slimehud status §7- show your current settings",
+                "§f/slimehud status §7- show HUD and WIT bridge status",
                 "");
     }
 }

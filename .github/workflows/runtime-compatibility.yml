@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  SLIMEFUN_VERSION: '4.1.50'
+  SLIMEFUN_VERSION: '4.1.59'
 
 jobs:
   build-candidate:
@@ -32,15 +32,70 @@ jobs:
         run: mvn -B -ntp clean package
 
       - name: Verify drop-in filename
-        run: test -s target/SF_SlimeHUD2.0.1.jar
+        run: test -s target/SF_SlimeHUD2.0.2.jar
 
       - name: Upload raw runtime candidate
         uses: actions/upload-artifact@v7
         with:
-          name: SF_SlimeHUD2.0.1.jar
-          path: target/SF_SlimeHUD2.0.1.jar
+          name: SF_SlimeHUD2.0.2.jar
+          path: target/SF_SlimeHUD2.0.2.jar
           archive: false
           if-no-files-found: error
+
+  wit-integration:
+    name: WIT 1.9.5 bridge / Paper 26.1.2
+    needs: build-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Download runtime candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: SF_SlimeHUD2.0.2.jar
+          path: build/runtime-candidate
+
+      - name: Resolve runtime candidate
+        id: addon
+        shell: bash
+        run: |
+          JAR="$(find build/runtime-candidate -name 'SF_SlimeHUD2.0.2.jar' -print -quit)"
+          test -n "$JAR"
+          test -s "$JAR"
+          echo "jar=$JAR" >> "$GITHUB_OUTPUT"
+
+      - name: Boot Slimefun Legacy + WIT + SF_SlimeHUD
+        env:
+          WIT_VERSION_ID: 'nhz12jiM'
+        run: |
+          chmod +x scripts/runtime_smoke.sh
+          bash scripts/runtime_smoke.sh \
+            paper \
+            26.1.2 \
+            STABLE \
+            "${{ steps.addon.outputs.jar }}" \
+            build/runtime-smoke-wit-26.1.2 \
+            supported
+
+      - name: Publish WIT bridge evidence
+        if: always()
+        shell: bash
+        run: |
+          RESULT=build/runtime-smoke-wit-26.1.2/smoke-result.txt
+          if [[ -f "$RESULT" ]]; then
+            echo '## WIT 1.9.5 bridge / Paper 26.1.2' >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RESULT" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   runtime:
     name: ${{ matrix.label }}
@@ -140,13 +195,13 @@ jobs:
             advisory: false
             expectation: supported
 
-          - label: Paper 26.3 pre-release / Java 25 (Slimefun gate advisory)
+          - label: Paper 26.3 candidate / Java 25
             family: paper
             minecraft: 26.3
             channel: ANY
             java: 25
             advisory: true
-            expectation: slimefun-version-gate
+            expectation: supported
 
     steps:
       - name: Checkout
@@ -161,14 +216,14 @@ jobs:
       - name: Download runtime candidate
         uses: actions/download-artifact@v8
         with:
-          name: SF_SlimeHUD2.0.1.jar
+          name: SF_SlimeHUD2.0.2.jar
           path: build/runtime-candidate
 
       - name: Resolve runtime candidate
         id: addon
         shell: bash
         run: |
-          JAR="$(find build/runtime-candidate -name 'SF_SlimeHUD2.0.1.jar' -print -quit)"
+          JAR="$(find build/runtime-candidate -name 'SF_SlimeHUD2.0.2.jar' -print -quit)"
           test -n "$JAR"
           test -s "$JAR"
           echo "jar=$JAR" >> "$GITHUB_OUTPUT"

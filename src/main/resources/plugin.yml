@@ -6,7 +6,7 @@ folia-supported: true
 authors:
   - SchnTgaiSpock
   - wickidcow
-description: Slimefun Legacy + vanilla WAILA HUD with per-player BossBar or ActionBar display.
+description: Slimefun Legacy + vanilla WAILA HUD with optional What Is That integration.
 website: https://github.com/wickidcow/SF_SlimeHUD
 
 depend:
@@ -14,6 +14,7 @@ depend:
 
 softdepend:
   - PlaceholderAPI
+  - WIT
 
 commands:
   slimehud:
