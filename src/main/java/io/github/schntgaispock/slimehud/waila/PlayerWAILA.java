@@ -184,7 +184,7 @@ public final class PlayerWAILA {
             }
 
             if (isVanillaEnabled()) {
-                String name = "&f" + VanillaInfoProvider.getName(targetBlock);
+                String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
                 String info = VanillaInfoProvider.getInfo(
                         targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
                 publishSnapshot(sequence, new HudSnapshot(name, info));
