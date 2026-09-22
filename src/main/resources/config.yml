@@ -10,6 +10,11 @@ integrations:
     # falls back to its own BossBar/ActionBar display.
     enabled: true
 
+    # Let SF_SlimeHUD provide vanilla block details while WIT owns the visible
+    # display. This keeps vanilla tool symbols and SlimeHUD's vanilla details
+    # consistent without changing WIT's entity handling.
+    use-slimehud-vanilla: true
+
 waila:
   # Disable the HUD globally.
   disabled: false
@@ -68,6 +73,19 @@ vanilla:
   show-spawner-type: true
   show-note-block: true
   show-farmland: true
+
+  # Show a compact preferred-tool marker beside vanilla block names.
+  # Slimefun blocks do not receive these markers. Vanilla spawners are special:
+  # their tool is Pickaxe of Containment rather than a normal vanilla pickaxe.
+  show-tool-symbol: true
+  tool-symbols:
+    pickaxe: "⛏"
+    axe: "🪓"
+    shovel: "🪏"
+    hoe: "⚒"
+    containment: "⛏"
+
+  # Keep the detailed tool/tier line, for example "Tool: Pickaxe (Diamond+)".
   show-tool: true
   show-waterlogged: false
   show-open-state: false
