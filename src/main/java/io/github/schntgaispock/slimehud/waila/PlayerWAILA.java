@@ -179,12 +179,23 @@ public final class PlayerWAILA {
                 HudRequest request = new HudRequest(slimefunItem, target, player);
                 String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
                 String info = SlimeHUD.getHudController().processRequest(request);
+
+                if (VanillaInfoProvider.isContainmentSpawner(slimefunItem, targetBlock)) {
+                    name += VanillaInfoProvider.getToolSymbolSuffix(
+                            targetBlock, SlimeHUD.getInstance().getConfig());
+                    String toolInfo = VanillaInfoProvider.getToolInfo(
+                            targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                    if (!toolInfo.isEmpty()) {
+                        info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
+                    }
+                }
+
                 publishSnapshot(sequence, new HudSnapshot(name, info));
                 return;
             }
 
             if (isVanillaEnabled()) {
-                String name = "&f" + VanillaInfoProvider.getName(targetBlock);
+                String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
                 String info = VanillaInfoProvider.getInfo(
                         targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
                 publishSnapshot(sequence, new HudSnapshot(name, info));

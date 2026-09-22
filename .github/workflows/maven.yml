@@ -54,14 +54,14 @@ jobs:
         run: mvn -B -ntp -Dpaper.version="${{ matrix.paper }}" clean package
 
       - name: Verify drop-in filename
-        run: test -s target/SF_SlimeHUD2.0.2.jar
+        run: test -s target/SF_SlimeHUD2.0.3.jar
 
       - name: Upload raw JAR
         if: matrix.artifact
         uses: actions/upload-artifact@v7
         with:
-          name: SF_SlimeHUD2.0.2.jar
-          path: target/SF_SlimeHUD2.0.2.jar
+          name: SF_SlimeHUD2.0.3.jar
+          path: target/SF_SlimeHUD2.0.3.jar
           archive: false
           if-no-files-found: error
 
@@ -72,17 +72,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG='v2.0.2'
-          JAR='target/SF_SlimeHUD2.0.2.jar'
+          TAG='v2.0.3'
+          JAR='target/SF_SlimeHUD2.0.3.jar'
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             while IFS= read -r OLD; do
-              if [[ "$OLD" == *.jar && "$OLD" != 'SF_SlimeHUD2.0.2.jar' ]]; then
+              if [[ "$OLD" == *.jar && "$OLD" != 'SF_SlimeHUD2.0.3.jar' ]]; then
                 gh release delete-asset "$TAG" "$OLD" --repo "$GITHUB_REPOSITORY" -y
               fi
             done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
             gh release upload "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title 'SF_SlimeHUD 2.0.2' \
-              --notes 'SF_SlimeHUD 2.0.2: Slimefun Legacy HUD repair with native JEG cooperation and optional What Is That integration for Minecraft 1.21.11 through 26.3.'
+              --title 'SF_SlimeHUD 2.0.3' \
+              --notes 'SF_SlimeHUD 2.0.3: Slimefun Legacy HUD repair with native JEG cooperation and optional What Is That integration for Minecraft 1.21.11 through 26.3.'
           fi
