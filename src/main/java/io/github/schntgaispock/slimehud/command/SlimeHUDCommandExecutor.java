@@ -21,6 +21,7 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
                 return true;
             }
             SlimeHUD.getInstance().reloadConfig();
+            WITIntegration.refresh();
             WAILAManager.getInstance().reloadAll();
             sender.sendMessage("§a§lSlimeHUD§7> §aConfiguration reloaded.");
             return true;
