@@ -13,6 +13,7 @@ SLIMEFUN_URL="${SLIMEFUN_URL:-https://github.com/wickidcow/Slimefun-Legacy/relea
 USER_AGENT="${RUNTIME_SMOKE_USER_AGENT:-SF_SlimeHUD-CI/2.0.2 (https://github.com/wickidcow/SF_SlimeHUD)}"
 STARTUP_TIMEOUT_SECONDS="${RUNTIME_SMOKE_STARTUP_TIMEOUT:-300}"
 SHUTDOWN_TIMEOUT_SECONDS="${RUNTIME_SMOKE_SHUTDOWN_TIMEOUT:-60}"
+WIT_VERSION_ID="${WIT_VERSION_ID:-}"
 
 for command in curl jq java; do
     if ! command -v "$command" >/dev/null 2>&1; then
@@ -50,6 +51,17 @@ curl --fail-with-body -L -sS -H "User-Agent: ${USER_AGENT}" \
     "$SLIMEFUN_URL"
 test -s "$WORK_DIR/plugins/Slimefun-Legacy${SLIMEFUN_VERSION}.jar"
 cp "$ADDON_JAR" "$WORK_DIR/plugins/SF_SlimeHUD2.0.2.jar"
+
+if [[ -n "$WIT_VERSION_ID" ]]; then
+    WIT_METADATA="$(curl --fail-with-body -sS -H "User-Agent: ${USER_AGENT}" "https://api.modrinth.com/v2/version/${WIT_VERSION_ID}")"
+    WIT_URL="$(jq -r '([.files[] | select(.primary == true)][0].url // .files[0].url // empty)' <<<"$WIT_METADATA")"
+    if [[ -z "$WIT_URL" || "$WIT_URL" == "null" ]]; then
+        echo "Could not resolve What Is That? version ${WIT_VERSION_ID}." >&2
+        exit 1
+    fi
+    curl --fail-with-body -L -sS -H "User-Agent: ${USER_AGENT}" -o "$WORK_DIR/plugins/WIT.jar" "$WIT_URL"
+    test -s "$WORK_DIR/plugins/WIT.jar"
+fi
 
 SERVER_URL=""
 SERVER_BUILD=""
@@ -136,6 +148,7 @@ Download: ${SERVER_URL}
 Java: $(java -version 2>&1 | head -n 1)
 Slimefun Legacy: ${SLIMEFUN_VERSION}
 Addon: SF_SlimeHUD 2.0.2
+What Is That?: ${WIT_VERSION_ID:-not installed}
 Expectation: ${EXPECTATION}
 EOF_BUILD
 
@@ -264,8 +277,21 @@ if ! grep -Fq 'Enabling SlimeHUD v2.0.2' "$CONSOLE_LOG"; then
     cat "$CONSOLE_LOG" >&2 || true
     exit 1
 fi
+if [[ -n "$WIT_VERSION_ID" ]]; then
+    if ! grep -Fq 'Enabling WIT v' "$CONSOLE_LOG"; then
+        echo "${FAMILY} ${MC_VERSION}: WIT enable line was not observed." >&2
+        cat "$CONSOLE_LOG" >&2 || true
+        exit 1
+    fi
+    if ! grep -Fq 'What Is That? bridge enabled. WIT will display Slimefun machine data supplied by SF_SlimeHUD.' "$CONSOLE_LOG"; then
+        echo "${FAMILY} ${MC_VERSION}: SF_SlimeHUD did not enable its WIT bridge." >&2
+        cat "$CONSOLE_LOG" >&2 || true
+        exit 1
+    fi
+fi
 if grep -Fq 'Error occurred while enabling SlimeHUD' "$CONSOLE_LOG" || \
-   grep -Fq 'Error occurred while enabling Slimefun' "$CONSOLE_LOG"; then
+   grep -Fq 'Error occurred while enabling Slimefun' "$CONSOLE_LOG" || \
+   grep -Fq 'Error occurred while enabling WIT' "$CONSOLE_LOG"; then
     echo "${FAMILY} ${MC_VERSION}: plugin enable failure detected." >&2
     cat "$CONSOLE_LOG" >&2 || true
     exit 1
@@ -293,6 +319,7 @@ Server reached Done: yes
 Slimefun enabled: yes
 SlimeHUD enabled: yes
 SlimeHUD runtime errors: none observed
+What Is That?: ${WIT_VERSION_ID:+enabled and bridge observed}${WIT_VERSION_ID:-not installed}
 Clean shutdown: yes
 EOF_RESULT
 cat "$WORK_DIR/smoke-result.txt"
