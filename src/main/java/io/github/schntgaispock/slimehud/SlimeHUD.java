@@ -1,6 +1,7 @@
 package io.github.schntgaispock.slimehud;
 
 import io.github.schntgaispock.slimehud.command.CommandManager;
+import io.github.schntgaispock.slimehud.integration.WITIntegration;
 import io.github.schntgaispock.slimehud.placeholder.PlaceholderManager;
 import io.github.schntgaispock.slimehud.translation.TranslationManager;
 import io.github.schntgaispock.slimehud.util.PlayerDataStore;
@@ -36,16 +37,18 @@ public final class SlimeHUD extends JavaPlugin {
         translationManager = new TranslationManager();
         hudController = new HudController();
 
+        WITIntegration.setup();
         WAILAManager.setup();
         CommandManager.setup();
         PlaceholderManager.setup();
 
-        getLogger().info("SF_SlimeHUD 2.0.1 enabled with Slimefun Legacy and vanilla block HUD support.");
+        getLogger().info("SF_SlimeHUD " + getPluginVersion() + " enabled with Slimefun Legacy and vanilla block HUD support.");
         getLogger().info("Paper/Purpur/Leaf/Folia compatibility target: Minecraft 1.21.11+.");
     }
 
     @Override
     public void onDisable() {
+        WITIntegration.shutdown();
         WAILAManager.shutdown();
         if (playerData != null) {
             playerData.save();
