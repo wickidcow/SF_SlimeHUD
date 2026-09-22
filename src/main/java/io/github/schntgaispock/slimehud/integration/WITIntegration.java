@@ -82,6 +82,15 @@ public final class WITIntegration implements Listener {
         instance = null;
     }
 
+    public static void refresh() {
+        if (instance == null) {
+            return;
+        }
+
+        instance.unhook();
+        instance.tryHook();
+    }
+
     public static boolean isHooked() {
         return instance != null && instance.hooked;
     }
