@@ -319,7 +319,7 @@ Server reached Done: yes
 Slimefun enabled: yes
 SlimeHUD enabled: yes
 SlimeHUD runtime errors: none observed
-What Is That?: ${WIT_VERSION_ID:+enabled and bridge observed}${WIT_VERSION_ID:-not installed}
+What Is That?: ${WIT_VERSION_ID:-not installed}
 Clean shutdown: yes
 EOF_RESULT
 cat "$WORK_DIR/smoke-result.txt"
