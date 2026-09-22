@@ -2,6 +2,7 @@ package io.github.schntgaispock.slimehud.integration;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.waila.HudRequest;
+import io.github.schntgaispock.slimehud.waila.VanillaInfoProvider;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -13,9 +14,11 @@ import me.mrCookieSlime.Slimefun.api.BlockStorage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -55,6 +58,8 @@ public final class WITIntegration implements Listener {
     private Method witIsHidden;
     private Field settingsDisabled;
     private Field witSneakingMode;
+    private Field witBlocksEnabled;
+    private Method witIsAllowedBlock;
 
     private boolean hooked;
 
@@ -125,6 +130,7 @@ public final class WITIntegration implements Listener {
             Class<?> witPluginClass = loader.loadClass("com.github.darksoulq.wit.api.WITPlugin");
             Class<?> witListenerClass = loader.loadClass("com.github.darksoulq.wit.WITListener");
             Class<?> settingsClass = loader.loadClass("com.github.darksoulq.wit.WITListener$PlayerSettings");
+            Class<?> itemGroupsClass = loader.loadClass("com.github.darksoulq.wit.misc.ItemGroups");
 
             infoConstructor = infoClass.getConstructor();
             infoSetName = infoClass.getMethod("setName", Component.class);
@@ -141,6 +147,8 @@ public final class WITIntegration implements Listener {
             witIsHidden = witListenerClass.getMethod("isHidden");
             settingsDisabled = settingsClass.getField("disabled");
             witSneakingMode = witListenerClass.getField("SNEAKING_MODE");
+            witBlocksEnabled = witListenerClass.getField("BLOCKS_ENABLED");
+            witIsAllowedBlock = itemGroupsClass.getMethod("isAllowedBlock", Material.class);
 
             witPlugin = candidate;
             blockHandler = this::handleBlock;
@@ -194,24 +202,47 @@ public final class WITIntegration implements Listener {
 
         try {
             SlimefunItem item = BlockStorage.check(block);
-            if (item == null) {
+            if (item != null) {
+                HudRequest request = new HudRequest(item, block.getLocation(), player);
+                String name = SlimeHUD.getTranslationManager().getItemName(item);
+                String info = SlimeHUD.getHudController().processRequest(request);
+                updateWitBar(name, info, player);
+                return true;
+            }
+
+            if (!plugin.getConfig().getBoolean("integrations.what-is-that.use-slimehud-vanilla", true)
+                    || !plugin.getConfig().getBoolean("vanilla.enabled", true)
+                    || !witAllowsVanillaBlock(block)) {
                 return false;
             }
 
-            HudRequest request = new HudRequest(item, block.getLocation(), player);
-            String name = SlimeHUD.getTranslationManager().getItemName(item);
-            String info = SlimeHUD.getHudController().processRequest(request);
-
-            Object witInfo = infoConstructor.newInstance();
-            infoSetName.invoke(witInfo, legacyComponent(name));
-            if (!info.isBlank()) {
-                infoAddSuffix.invoke(witInfo, legacyComponent(info));
-            }
-
-            apiUpdateBar.invoke(null, witInfo, player);
+            ItemStack heldItem = player.getInventory().getItemInMainHand().clone();
+            String name = "&f" + VanillaInfoProvider.getName(block, plugin.getConfig());
+            String info = VanillaInfoProvider.getInfo(block, heldItem, plugin.getConfig());
+            updateWitBar(name, info, player);
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
             plugin.getLogger().log(Level.FINE, "WIT could not render a Slimefun block through SF_SlimeHUD.", error);
+            return false;
+        }
+    }
+
+    private void updateWitBar(String name, String info, Player player) throws ReflectiveOperationException {
+        Object witInfo = infoConstructor.newInstance();
+        infoSetName.invoke(witInfo, legacyComponent(name));
+        if (!info.isBlank()) {
+            infoAddSuffix.invoke(witInfo, legacyComponent(info));
+        }
+        apiUpdateBar.invoke(null, witInfo, player);
+    }
+
+    private boolean witAllowsVanillaBlock(Block block) {
+        try {
+            if (witBlocksEnabled != null && !witBlocksEnabled.getBoolean(null)) {
+                return false;
+            }
+            return witIsAllowedBlock == null || (Boolean) witIsAllowedBlock.invoke(null, block.getType());
+        } catch (ReflectiveOperationException | RuntimeException error) {
             return false;
         }
     }
@@ -306,6 +337,8 @@ public final class WITIntegration implements Listener {
         witIsHidden = null;
         settingsDisabled = null;
         witSneakingMode = null;
+        witBlocksEnabled = null;
+        witIsAllowedBlock = null;
     }
 
     @EventHandler
