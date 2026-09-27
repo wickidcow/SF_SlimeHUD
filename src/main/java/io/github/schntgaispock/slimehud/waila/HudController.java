@@ -2,10 +2,12 @@ package io.github.schntgaispock.slimehud.waila;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.util.HudBuilder;
+import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
 import io.github.schntgaispock.slimehud.util.Util;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.api.network.Network;
 import io.github.thebusybiscuit.slimefun4.core.attributes.EnergyNetComponent;
+import io.github.thebusybiscuit.slimefun4.core.attributes.EnergyNetProvider;
 import io.github.thebusybiscuit.slimefun4.core.attributes.MachineProcessHolder;
 import io.github.thebusybiscuit.slimefun4.core.machines.MachineOperation;
 import io.github.thebusybiscuit.slimefun4.core.networks.cargo.CargoNet;
@@ -19,17 +21,22 @@ import io.github.thebusybiscuit.slimefun4.implementation.items.electric.EnergyRe
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public final class HudController {
 
     private final Map<Class<?>, Function<HudRequest, String>> defaultHandlers = new LinkedHashMap<>();
     private final Map<Class<?>, Function<HudRequest, String>> customHandlers = new LinkedHashMap<>();
+    private final Set<Class<?>> warnedHandlerFailures = ConcurrentHashMap.newKeySet();
 
     public HudController() {
         registerDefaultHandler(MachineProcessHolder.class, this::processMachine);
         registerDefaultHandler(EnergyRegulator.class, this::processEnergyNode);
         registerDefaultHandler(EnergyConnector.class, this::processEnergyNode);
+        // Providers must be checked before the broader EnergyNetComponent handler.
+        registerDefaultHandler(EnergyNetProvider.class, this::processEnergyProvider);
         registerDefaultHandler(EnergyNetComponent.class, this::processCapacitor);
         registerDefaultHandler(CargoNode.class, this::processCargoNode);
         registerDefaultHandler(CargoConnectorNode.class, this::processCargoManagerConnector);
@@ -52,50 +59,69 @@ public final class HudController {
 
         EnergyNetComponent component = (EnergyNetComponent) request.getSlimefunItem();
         EnergyNetComponentType type = component.getEnergyComponentType();
+        long capacity = component.getCapacityLong();
         if ((type == EnergyNetComponentType.CAPACITOR
                         || type == EnergyNetComponentType.GENERATOR
                         || type == EnergyNetComponentType.CONSUMER)
-                && component.getCapacity() > 0) {
-            return HudBuilder.formatEnergyStored(component.getCharge(request.getLocation()), component.getCapacity());
+                && capacity > 0) {
+            return HudBuilder.formatEnergyStored(component.getChargeLong(request.getLocation()), capacity);
         }
         return "";
     }
 
-    @SuppressWarnings("unchecked")
-    private String processMachine(HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-machine-progress", true)) {
-            return "";
+    private String processEnergyProvider(HudRequest request) {
+        StringBuilder text = new StringBuilder();
+
+        if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation", true)) {
+            appendPart(text, getGeneratorInfo(request));
         }
 
-        StringBuilder text = new StringBuilder();
-        MachineProcessHolder<MachineOperation> machine =
-                (MachineProcessHolder<MachineOperation>) request.getSlimefunItem();
-        MachineOperation operation = machine.getMachineProcessor().getOperation(request.getLocation());
+        appendPart(text, processCapacitor(request));
+        return text.toString();
+    }
 
-        if (operation == null) {
-            text.append("Idle");
-        } else {
-            text.append(HudBuilder.formatProgressBar(operation.getProgress(), operation.getTotalTicks()));
+    @SuppressWarnings("unchecked")
+    private String processMachine(HudRequest request) {
+        StringBuilder text = new StringBuilder();
+
+        if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-machine-progress", true)) {
+            MachineProcessHolder<MachineOperation> machine =
+                    (MachineProcessHolder<MachineOperation>) request.getSlimefunItem();
+            MachineOperation operation = machine.getMachineProcessor().getOperation(request.getLocation());
+
+            if (operation == null) {
+                appendPart(text, "Idle");
+            } else {
+                appendPart(text, HudBuilder.formatProgressBar(operation.getProgress(), operation.getTotalTicks()));
+            }
         }
 
         if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation", true)) {
-            String generation = getGeneratorInfo(request.getSlimefunItem());
-            if (!generation.isEmpty()) {
-                text.append(" &7| ").append(generation);
-            }
+            appendPart(text, getGeneratorInfo(request));
         }
 
         if (request.getSlimefunItem() instanceof EnergyNetComponent) {
-            String stored = processCapacitor(request);
-            if (!stored.isEmpty()) {
-                text.append(" &7| ").append(stored);
-            }
+            appendPart(text, processCapacitor(request));
         }
 
         return text.toString();
     }
 
-    private String getGeneratorInfo(SlimefunItem item) {
+    private String getGeneratorInfo(HudRequest request) {
+        SlimefunItem item = request.getSlimefunItem();
+
+        if (item instanceof EnergyNetProvider provider) {
+            try {
+                var data = StorageCacheUtils.getDataContainer(request.getLocation());
+                if (data != null && !data.isPendingRemove() && data.isDataLoaded()) {
+                    long generation = Math.max(0L, provider.getGeneratedOutputLong(request.getLocation(), data));
+                    return generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
+                }
+            } catch (RuntimeException | LinkageError ignored) {
+                // Fall through to the compatibility probes below.
+            }
+        }
+
         Number production = invokeNumber(item, "getEnergyProduction");
         if (production != null && production.longValue() > 0) {
             return HudBuilder.formatEnergyGenerated(production.longValue());
@@ -111,6 +137,16 @@ public final class HudController {
             return result;
         }
         return "";
+    }
+
+    private void appendPart(StringBuilder text, String part) {
+        if (part == null || part.isEmpty()) {
+            return;
+        }
+        if (!text.isEmpty()) {
+            text.append(" &7| ");
+        }
+        text.append(part);
     }
 
     private Number invokeNumber(Object target, String methodName) {
@@ -160,12 +196,24 @@ public final class HudController {
     }
 
     public String processRequest(HudRequest request) {
-        Function<HudRequest, String> handler = tryGetHandler(request.getSlimefunItem());
+        SlimefunItem item = request.getSlimefunItem();
+        Function<HudRequest, String> handler = tryGetHandler(item);
         if (handler == null) {
             return "";
         }
-        String result = handler.apply(request);
-        return result == null ? "" : result;
+
+        try {
+            String result = handler.apply(request);
+            return result == null ? "" : result;
+        } catch (RuntimeException | LinkageError error) {
+            if (warnedHandlerFailures.add(item.getClass())) {
+                SlimeHUD.getInstance().getLogger().warning(
+                        "SlimeHUD handler failed for " + item.getId() + " (" + item.getClass().getName()
+                                + "). The block name will still be shown; detailed HUD info is disabled for this "
+                                + "handler until the plugin is restarted. Cause: " + error);
+            }
+            return "";
+        }
     }
 
     private void registerDefaultHandler(Class<?> type, Function<HudRequest, String> handler) {

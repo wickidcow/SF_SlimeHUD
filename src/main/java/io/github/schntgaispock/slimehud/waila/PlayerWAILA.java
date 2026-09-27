@@ -209,38 +209,38 @@ public final class PlayerWAILA {
         Bukkit.getRegionScheduler().execute(SlimeHUD.getInstance(), target, () -> {
             try {
                 Block targetBlock = target.getBlock();
-            if (targetBlock.getType().isAir()) {
-                publishSnapshot(sequence, new HudSnapshot("", ""));
-                return;
-            }
-
-            SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
-            if (slimefunItem != null) {
-                HudRequest request = new HudRequest(slimefunItem, target, player);
-                String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
-                String info = SlimeHUD.getHudController().processRequest(request);
-
-                if (VanillaInfoProvider.isContainmentSpawner(slimefunItem, targetBlock)) {
-                    name += VanillaInfoProvider.getToolSymbolSuffix(
-                            targetBlock, SlimeHUD.getInstance().getConfig());
-                    String toolInfo = VanillaInfoProvider.getToolInfo(
-                            targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
-                    if (!toolInfo.isEmpty()) {
-                        info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
-                    }
+                if (targetBlock.getType().isAir()) {
+                    publishSnapshot(sequence, new HudSnapshot("", ""));
+                    return;
                 }
 
-                publishSnapshot(sequence, new HudSnapshot(name, info));
-                return;
-            }
+                SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
+                if (slimefunItem != null) {
+                    HudRequest request = new HudRequest(slimefunItem, target, player);
+                    String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
+                    String info = SlimeHUD.getHudController().processRequest(request);
 
-            if (isVanillaEnabled()) {
-                String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
-                String info = VanillaInfoProvider.getInfo(
-                        targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
-                publishSnapshot(sequence, new HudSnapshot(name, info));
-                return;
-            }
+                    if (VanillaInfoProvider.isContainmentSpawner(slimefunItem, targetBlock)) {
+                        name += VanillaInfoProvider.getToolSymbolSuffix(
+                                targetBlock, SlimeHUD.getInstance().getConfig());
+                        String toolInfo = VanillaInfoProvider.getToolInfo(
+                                targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                        if (!toolInfo.isEmpty()) {
+                            info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
+                        }
+                    }
+
+                    publishSnapshot(sequence, new HudSnapshot(name, info));
+                    return;
+                }
+
+                if (isVanillaEnabled()) {
+                    String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
+                    String info = VanillaInfoProvider.getInfo(
+                            targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                    publishSnapshot(sequence, new HudSnapshot(name, info));
+                    return;
+                }
 
                 publishSnapshot(sequence, new HudSnapshot("", ""));
             } catch (RuntimeException | LinkageError error) {
