@@ -10,6 +10,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import me.mrCookieSlime.Slimefun.api.BlockStorage;
@@ -42,6 +45,8 @@ public final class WITIntegration implements Listener {
     private static WITIntegration instance;
 
     private final SlimeHUD plugin;
+    private final Set<UUID> bridgeFailures = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> warnedBridgeFailures = ConcurrentHashMap.newKeySet();
 
     private Plugin witPlugin;
     private BiFunction<Block, Player, Boolean> blockHandler;
@@ -100,6 +105,10 @@ public final class WITIntegration implements Listener {
 
     public static boolean isHooked() {
         return instance != null && instance.hooked;
+    }
+
+    public static boolean hasBridgeFailure(Player player) {
+        return instance != null && instance.bridgeFailures.contains(player.getUniqueId());
     }
 
     /**
@@ -219,6 +228,7 @@ public final class WITIntegration implements Listener {
                 }
 
                 updateWitBar(name, info, player);
+                bridgeFailures.remove(player.getUniqueId());
                 return true;
             }
 
@@ -232,9 +242,18 @@ public final class WITIntegration implements Listener {
             String name = "&f" + VanillaInfoProvider.getName(block, plugin.getConfig());
             String info = VanillaInfoProvider.getInfo(block, heldItem, plugin.getConfig());
             updateWitBar(name, info, player);
+            bridgeFailures.remove(player.getUniqueId());
             return true;
         } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
-            plugin.getLogger().log(Level.FINE, "WIT could not render a Slimefun block through SF_SlimeHUD.", error);
+            UUID playerId = player.getUniqueId();
+            bridgeFailures.add(playerId);
+            if (warnedBridgeFailures.add(playerId)) {
+                plugin.getLogger().log(
+                        Level.WARNING,
+                        "The WIT bridge failed for " + player.getName()
+                                + ". SF_SlimeHUD will fall back to its native HUD and keep retrying the bridge.",
+                        error);
+            }
             return false;
         }
     }
@@ -273,7 +292,8 @@ public final class WITIntegration implements Listener {
 
     private boolean shouldDelegateInternal(Player player) {
         if (!hooked || !integrationEnabled() || !isSlimeHudEnabledFor(player)
-                || witPlugin == null || !witPlugin.isEnabled()) {
+                || witPlugin == null || !witPlugin.isEnabled()
+                || bridgeFailures.contains(player.getUniqueId())) {
             return false;
         }
 
@@ -359,6 +379,8 @@ public final class WITIntegration implements Listener {
         witSneakingMode = null;
         witBlocksEnabled = null;
         witIsAllowedBlock = null;
+        bridgeFailures.clear();
+        warnedBridgeFailures.clear();
     }
 
     @EventHandler

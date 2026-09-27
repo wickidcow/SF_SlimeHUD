@@ -1,6 +1,15 @@
-# SF_SlimeHUD 2.0.3
+# SF_SlimeHUD 2.0.4
 
 A modernized SlimeHUD fork for **Slimefun Legacy** and Minecraft **1.21.11+** on Paper-family servers.
+
+## What changed in 2.0.4
+
+- Keeps each player's recurring HUD updater alive if a runtime or linkage error occurs instead of allowing one bad update to permanently stop SlimeHUD.
+- Guards asynchronous block and dropped-item inspection so addon/API failures cannot silently kill HUD updates.
+- Makes the optional WIT bridge fail open: if WIT rendering throws, SlimeHUD immediately falls back to its native BossBar/ActionBar and continues retrying the bridge.
+- Promotes WIT bridge failures from hidden FINE logging to a one-time actionable warning per player session.
+- Expands `/slimehud status` with controller state, paused/running state, current target, last HUD error, and WIT fallback state.
+- Moves runtime compatibility validation to Slimefun Legacy 4.1.61.
 
 ## What changed in 2.0.3
 
@@ -81,7 +90,7 @@ Admin: `/slimehud reload`
 
 The Maven build produces exactly:
 
-`SF_SlimeHUD2.0.3.jar`
+`SF_SlimeHUD2.0.4.jar`
 
 ## Compatibility target
 

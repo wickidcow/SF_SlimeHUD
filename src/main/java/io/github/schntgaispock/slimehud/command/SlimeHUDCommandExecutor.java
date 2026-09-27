@@ -122,8 +122,22 @@ public final class SlimeHUDCommandExecutor implements CommandExecutor {
 
         player.sendMessage("§a§lSlimeHUD§7> HUD: " + (enabled ? "§aenabled" : "§cdisabled")
                 + "§7, display: §f" + mode.id() + "§7.");
+        PlayerWAILA waila = WAILAManager.getInstance().getWaila(player);
+        if (waila == null) {
+            player.sendMessage("§a§lSlimeHUD§7> Controller: §cmissing§7. Use §f/slimehud reload§7 to rebuild it.");
+        } else {
+            player.sendMessage("§a§lSlimeHUD§7> Controller: "
+                    + (waila.isTaskRunning() ? "§arunning" : "§cstopped")
+                    + (waila.isPaused() ? "§7, §epaused" : "§7, §aactive")
+                    + "§7, target: §f" + (waila.getFacingBlock().isEmpty() ? "(none)" : waila.getFacingBlock()));
+            if (!waila.getLastFailure().isEmpty()) {
+                player.sendMessage("§a§lSlimeHUD§7> Last HUD error: §c" + waila.getLastFailure());
+            }
+        }
+
         player.sendMessage("§a§lSlimeHUD§7> WIT bridge: "
-                + (WITIntegration.shouldDelegate(player) ? "§aactive §7(WIT owns display)" :
+                + (WITIntegration.hasBridgeFailure(player) ? "§efallback §7(native HUD active after a bridge error)" :
+                WITIntegration.shouldDelegate(player) ? "§aactive §7(WIT owns display)" :
                 WITIntegration.isHooked() ? "§eavailable §7(SlimeHUD currently owns display)" : "§8not active"));
         return true;
     }
