@@ -6,6 +6,7 @@ import io.github.schntgaispock.slimehud.util.Util;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import me.mrCookieSlime.Slimefun.api.BlockStorage;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -40,6 +41,9 @@ public final class PlayerWAILA {
     private String facingBlockInfo = "";
     private volatile Integer maxDistanceOverride;
     private volatile Boolean vanillaEnabledOverride;
+    private volatile String lastFailure = "";
+    private volatile long lastFailureEpochMillis;
+    private volatile long lastFailureLogEpochMillis;
 
     public PlayerWAILA(Player player) {
         this.player = player;
@@ -67,7 +71,7 @@ public final class PlayerWAILA {
         long period = Math.max(1L, SlimeHUD.getInstance().getConfig().getLong("waila.tick-rate", 5L));
         task = player.getScheduler().runAtFixedRate(
                 SlimeHUD.getInstance(),
-                scheduledTask -> update(),
+                scheduledTask -> runUpdateSafely(),
                 null,
                 1L,
                 period);
@@ -88,7 +92,38 @@ public final class PlayerWAILA {
     }
 
     public void run() {
-        update();
+        runUpdateSafely();
+    }
+
+    private void runUpdateSafely() {
+        try {
+            update();
+        } catch (RuntimeException | LinkageError error) {
+            recordFailure("native HUD update", error);
+            try {
+                clearFacing();
+                clearDisplay();
+            } catch (RuntimeException | LinkageError ignored) {
+                // Preserve the repeating scheduler even if display cleanup also fails.
+            }
+        }
+    }
+
+    private void recordFailure(String phase, Throwable error) {
+        long now = System.currentTimeMillis();
+        String detail = error.getMessage();
+        lastFailure = phase + ": " + error.getClass().getSimpleName()
+                + (detail == null || detail.isBlank() ? "" : " - " + detail);
+        lastFailureEpochMillis = now;
+
+        if (now - lastFailureLogEpochMillis >= 15_000L) {
+            lastFailureLogEpochMillis = now;
+            SlimeHUD.getInstance().getLogger().log(
+                    Level.WARNING,
+                    "SlimeHUD " + phase + " failed for " + player.getName()
+                            + ". The HUD updater will stay alive and retry automatically.",
+                    error);
+        }
     }
 
     private void update() {
@@ -158,51 +193,59 @@ public final class PlayerWAILA {
         droppedItem.getScheduler().run(
                 SlimeHUD.getInstance(),
                 scheduledTask -> {
-                    ItemStack stack = droppedItem.getItemStack().clone();
-                    ItemInfoProvider.ItemHud itemHud =
-                            ItemInfoProvider.describe(stack, SlimeHUD.getInstance().getConfig());
-                    publishSnapshot(sequence, new HudSnapshot(itemHud.name(), itemHud.info()));
+                    try {
+                        ItemStack stack = droppedItem.getItemStack().clone();
+                        ItemInfoProvider.ItemHud itemHud =
+                                ItemInfoProvider.describe(stack, SlimeHUD.getInstance().getConfig());
+                        publishSnapshot(sequence, new HudSnapshot(itemHud.name(), itemHud.info()));
+                    } catch (RuntimeException | LinkageError error) {
+                        recordFailure("dropped-item inspection", error);
+                    }
                 },
                 null);
     }
 
     private void inspectBlock(long sequence, Location target, ItemStack heldItem) {
         Bukkit.getRegionScheduler().execute(SlimeHUD.getInstance(), target, () -> {
-            Block targetBlock = target.getBlock();
-            if (targetBlock.getType().isAir()) {
-                publishSnapshot(sequence, new HudSnapshot("", ""));
-                return;
-            }
-
-            SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
-            if (slimefunItem != null) {
-                HudRequest request = new HudRequest(slimefunItem, target, player);
-                String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
-                String info = SlimeHUD.getHudController().processRequest(request);
-
-                if (VanillaInfoProvider.isContainmentSpawner(slimefunItem, targetBlock)) {
-                    name += VanillaInfoProvider.getToolSymbolSuffix(
-                            targetBlock, SlimeHUD.getInstance().getConfig());
-                    String toolInfo = VanillaInfoProvider.getToolInfo(
-                            targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
-                    if (!toolInfo.isEmpty()) {
-                        info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
-                    }
+            try {
+                Block targetBlock = target.getBlock();
+                if (targetBlock.getType().isAir()) {
+                    publishSnapshot(sequence, new HudSnapshot("", ""));
+                    return;
                 }
 
-                publishSnapshot(sequence, new HudSnapshot(name, info));
-                return;
-            }
+                SlimefunItem slimefunItem = BlockStorage.check(targetBlock);
+                if (slimefunItem != null) {
+                    HudRequest request = new HudRequest(slimefunItem, target, player);
+                    String name = SlimeHUD.getTranslationManager().getItemName(slimefunItem);
+                    String info = SlimeHUD.getHudController().processRequest(request);
 
-            if (isVanillaEnabled()) {
-                String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
-                String info = VanillaInfoProvider.getInfo(
-                        targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
-                publishSnapshot(sequence, new HudSnapshot(name, info));
-                return;
-            }
+                    if (VanillaInfoProvider.isContainmentSpawner(slimefunItem, targetBlock)) {
+                        name += VanillaInfoProvider.getToolSymbolSuffix(
+                                targetBlock, SlimeHUD.getInstance().getConfig());
+                        String toolInfo = VanillaInfoProvider.getToolInfo(
+                                targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                        if (!toolInfo.isEmpty()) {
+                            info = info.isEmpty() ? toolInfo : info + " &8| &7" + toolInfo;
+                        }
+                    }
 
-            publishSnapshot(sequence, new HudSnapshot("", ""));
+                    publishSnapshot(sequence, new HudSnapshot(name, info));
+                    return;
+                }
+
+                if (isVanillaEnabled()) {
+                    String name = "&f" + VanillaInfoProvider.getName(targetBlock, SlimeHUD.getInstance().getConfig());
+                    String info = VanillaInfoProvider.getInfo(
+                            targetBlock, heldItem, SlimeHUD.getInstance().getConfig());
+                    publishSnapshot(sequence, new HudSnapshot(name, info));
+                    return;
+                }
+
+                publishSnapshot(sequence, new HudSnapshot("", ""));
+            } catch (RuntimeException | LinkageError error) {
+                recordFailure("block inspection", error);
+            }
         });
     }
 
@@ -363,6 +406,18 @@ public final class PlayerWAILA {
 
     public Boolean getVanillaEnabledOverride() {
         return vanillaEnabledOverride;
+    }
+
+    public boolean isTaskRunning() {
+        return task != null;
+    }
+
+    public String getLastFailure() {
+        return lastFailure;
+    }
+
+    public long getLastFailureEpochMillis() {
+        return lastFailureEpochMillis;
     }
 
     public void clearExternalOverrides() {
