@@ -2,12 +2,10 @@ package io.github.schntgaispock.slimehud.waila;
 
 import io.github.schntgaispock.slimehud.SlimeHUD;
 import io.github.schntgaispock.slimehud.util.HudBuilder;
-import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
 import io.github.schntgaispock.slimehud.util.Util;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.api.network.Network;
 import io.github.thebusybiscuit.slimefun4.core.attributes.EnergyNetComponent;
-import io.github.thebusybiscuit.slimefun4.core.attributes.EnergyNetProvider;
 import io.github.thebusybiscuit.slimefun4.core.attributes.MachineProcessHolder;
 import io.github.thebusybiscuit.slimefun4.core.machines.MachineOperation;
 import io.github.thebusybiscuit.slimefun4.core.networks.cargo.CargoNet;
@@ -35,8 +33,6 @@ public final class HudController {
         registerDefaultHandler(MachineProcessHolder.class, this::processMachine);
         registerDefaultHandler(EnergyRegulator.class, this::processEnergyNode);
         registerDefaultHandler(EnergyConnector.class, this::processEnergyNode);
-        // Providers must be checked before the broader EnergyNetComponent handler.
-        registerDefaultHandler(EnergyNetProvider.class, this::processEnergyProvider);
         registerDefaultHandler(EnergyNetComponent.class, this::processCapacitor);
         registerDefaultHandler(CargoNode.class, this::processCargoNode);
         registerDefaultHandler(CargoConnectorNode.class, this::processCargoManagerConnector);
@@ -53,30 +49,30 @@ public final class HudController {
     }
 
     private String processCapacitor(HudRequest request) {
-        if (!SlimeHUD.getInstance().getConfig().getBoolean("waila.show-energy-stored", true)) {
-            return "";
-        }
-
         EnergyNetComponent component = (EnergyNetComponent) request.getSlimefunItem();
         EnergyNetComponentType type = component.getEnergyComponentType();
-        long capacity = component.getCapacityLong();
-        if ((type == EnergyNetComponentType.CAPACITOR
-                        || type == EnergyNetComponentType.GENERATOR
-                        || type == EnergyNetComponentType.CONSUMER)
-                && capacity > 0) {
-            return HudBuilder.formatEnergyStored(component.getChargeLong(request.getLocation()), capacity);
-        }
-        return "";
-    }
-
-    private String processEnergyProvider(HudRequest request) {
         StringBuilder text = new StringBuilder();
 
-        if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation", true)) {
-            appendPart(text, getGeneratorInfo(request));
+        // Some generators (notably SolarGenerator and addon generators) are not
+        // MachineProcessHolders. Preserve their HUD output through the broader
+        // EnergyNetComponent path using APIs available on the oldest supported
+        // Slimefun compile floor.
+        if (type == EnergyNetComponentType.GENERATOR
+                && SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation", true)) {
+            appendPart(text, getGeneratorInfo(request.getSlimefunItem()));
         }
 
-        appendPart(text, processCapacitor(request));
+        if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-energy-stored", true)
+                && (type == EnergyNetComponentType.CAPACITOR
+                        || type == EnergyNetComponentType.GENERATOR
+                        || type == EnergyNetComponentType.CONSUMER)
+                && component.getCapacity() > 0) {
+            appendPart(
+                    text,
+                    HudBuilder.formatEnergyStored(
+                            component.getCharge(request.getLocation()), component.getCapacity()));
+        }
+
         return text.toString();
     }
 
@@ -97,31 +93,24 @@ public final class HudController {
         }
 
         if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-generator-generation", true)) {
-            appendPart(text, getGeneratorInfo(request));
+            appendPart(text, getGeneratorInfo(request.getSlimefunItem()));
         }
 
         if (request.getSlimefunItem() instanceof EnergyNetComponent) {
-            appendPart(text, processCapacitor(request));
+            EnergyNetComponent component = (EnergyNetComponent) request.getSlimefunItem();
+            if (SlimeHUD.getInstance().getConfig().getBoolean("waila.show-energy-stored", true)
+                    && component.getCapacity() > 0) {
+                appendPart(
+                        text,
+                        HudBuilder.formatEnergyStored(
+                                component.getCharge(request.getLocation()), component.getCapacity()));
+            }
         }
 
         return text.toString();
     }
 
-    private String getGeneratorInfo(HudRequest request) {
-        SlimefunItem item = request.getSlimefunItem();
-
-        if (item instanceof EnergyNetProvider provider) {
-            try {
-                var data = StorageCacheUtils.getDataContainer(request.getLocation());
-                if (data != null && !data.isPendingRemove() && data.isDataLoaded()) {
-                    long generation = Math.max(0L, provider.getGeneratedOutputLong(request.getLocation(), data));
-                    return generation > 0 ? HudBuilder.formatEnergyGenerated(generation) : "Not generating";
-                }
-            } catch (RuntimeException | LinkageError ignored) {
-                // Fall through to the compatibility probes below.
-            }
-        }
-
+    private String getGeneratorInfo(SlimefunItem item) {
         Number production = invokeNumber(item, "getEnergyProduction");
         if (production != null && production.longValue() > 0) {
             return HudBuilder.formatEnergyGenerated(production.longValue());
