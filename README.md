@@ -9,6 +9,9 @@ A modernized SlimeHUD fork for **Slimefun Legacy** and Minecraft **1.21.11+** on
 - Makes the optional WIT bridge fail open: if WIT rendering throws, SlimeHUD immediately falls back to its native BossBar/ActionBar and continues retrying the bridge.
 - Promotes WIT bridge failures from hidden FINE logging to a one-time actionable warning per player session.
 - Expands `/slimehud status` with controller state, paused/running state, current target, last HUD error, and WIT fallback state.
+- Restores generator information for energy generators that are not machine-process holders, including solar-style generators.
+- Keeps machine progress, generator output, and stored-energy settings independent so disabling one does not suppress the others.
+- Falls back to SlimeHUD's generic machine/energy handler if an addon's custom HUD callback throws, while retaining the addon callback as first priority when healthy.
 - Moves runtime compatibility validation to Slimefun Legacy 4.1.61.
 
 ## What changed in 2.0.3
@@ -34,7 +37,9 @@ Example native display:
 
 `Stone [⛏] | Tool: Pickaxe`
 
-`Spawner [⛏] | Spawner: Zombie | Tool: Pickaxe of Containment`\n\nThe same containment marker is allowed for a Slimefun RepairedSpawner, but not for addon spawner machines.
+`Spawner [⛏] | Spawner: Zombie | Tool: Pickaxe of Containment`
+
+The same containment marker is allowed for a Slimefun RepairedSpawner, but not for addon spawner machines.
 
 The symbols are controlled by:
 

@@ -84,5 +84,5 @@ jobs:
           else
             gh release create "$TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title 'SF_SlimeHUD 2.0.4' \
-              --notes 'SF_SlimeHUD 2.0.4: runtime reliability hardening, WIT fail-open recovery, and Slimefun Legacy 4.1.61 validation for Minecraft 1.21.11 through 26.3.'
+              --notes 'SF_SlimeHUD 2.0.4: runtime reliability hardening, restored generator HUD coverage, addon-handler fallback, optional WIT fail-open recovery, and Slimefun Legacy 4.1.61 validation for Minecraft 1.21.11 through 26.3.'
           fi
