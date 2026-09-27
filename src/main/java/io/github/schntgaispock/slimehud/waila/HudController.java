@@ -27,7 +27,7 @@ public final class HudController {
 
     private final Map<Class<?>, Function<HudRequest, String>> defaultHandlers = new LinkedHashMap<>();
     private final Map<Class<?>, Function<HudRequest, String>> customHandlers = new LinkedHashMap<>();
-    private final Set<Class<?>> warnedHandlerFailures = ConcurrentHashMap.newKeySet();
+    private final Set<String> warnedHandlerFailures = ConcurrentHashMap.newKeySet();
 
     public HudController() {
         registerDefaultHandler(MachineProcessHolder.class, this::processMachine);
@@ -170,13 +170,9 @@ public final class HudController {
         return network == null ? -1 : network.getSize();
     }
 
-    private Function<HudRequest, String> tryGetHandler(SlimefunItem item) {
-        for (Map.Entry<Class<?>, Function<HudRequest, String>> entry : customHandlers.entrySet()) {
-            if (entry.getKey().isInstance(item)) {
-                return entry.getValue();
-            }
-        }
-        for (Map.Entry<Class<?>, Function<HudRequest, String>> entry : defaultHandlers.entrySet()) {
+    private Function<HudRequest, String> tryGetHandler(
+            SlimefunItem item, Map<Class<?>, Function<HudRequest, String>> handlers) {
+        for (Map.Entry<Class<?>, Function<HudRequest, String>> entry : handlers.entrySet()) {
             if (entry.getKey().isInstance(item)) {
                 return entry.getValue();
             }
@@ -186,23 +182,44 @@ public final class HudController {
 
     public String processRequest(HudRequest request) {
         SlimefunItem item = request.getSlimefunItem();
-        Function<HudRequest, String> handler = tryGetHandler(item);
-        if (handler == null) {
+        Function<HudRequest, String> customHandler = tryGetHandler(item, customHandlers);
+
+        if (customHandler != null) {
+            try {
+                String result = customHandler.apply(request);
+                return result == null ? "" : result;
+            } catch (RuntimeException | LinkageError error) {
+                warnHandlerFailure(item, "custom", error, true);
+            }
+        }
+
+        Function<HudRequest, String> defaultHandler = tryGetHandler(item, defaultHandlers);
+        if (defaultHandler == null) {
             return "";
         }
 
         try {
-            String result = handler.apply(request);
+            String result = defaultHandler.apply(request);
             return result == null ? "" : result;
         } catch (RuntimeException | LinkageError error) {
-            if (warnedHandlerFailures.add(item.getClass())) {
-                SlimeHUD.getInstance().getLogger().warning(
-                        "SlimeHUD handler failed for " + item.getId() + " (" + item.getClass().getName()
-                                + "). The block name will still be shown; detailed HUD info is disabled for this "
-                                + "handler until the plugin is restarted. Cause: " + error);
-            }
+            warnHandlerFailure(item, "default", error, false);
             return "";
         }
+    }
+
+    private void warnHandlerFailure(SlimefunItem item, String handlerType, Throwable error, boolean fallbackAvailable) {
+        String warningKey = handlerType + ':' + item.getClass().getName();
+        if (!warnedHandlerFailures.add(warningKey)) {
+            return;
+        }
+
+        SlimeHUD.getInstance().getLogger().warning(
+                "SlimeHUD " + handlerType + " handler failed for " + item.getId() + " ("
+                        + item.getClass().getName() + "). "
+                        + (fallbackAvailable
+                                ? "SlimeHUD will try its generic handler and will keep retrying the custom callback."
+                                : "The block name will remain visible and SlimeHUD will keep retrying the handler.")
+                        + " Further warnings for this handler are suppressed until restart. Cause: " + error);
     }
 
     private void registerDefaultHandler(Class<?> type, Function<HudRequest, String> handler) {
