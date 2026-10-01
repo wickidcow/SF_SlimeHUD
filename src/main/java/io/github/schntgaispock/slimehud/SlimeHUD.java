@@ -33,7 +33,15 @@ public final class SlimeHUD extends JavaPlugin {
 
         saveDefaultConfig();
 
-        playerData = new PlayerDataStore(this);
+        playerData = null;
+        try {
+            playerData = new PlayerDataStore(this);
+        } catch (RuntimeException exception) {
+            getLogger().log(Level.SEVERE,
+                    "SlimeHUD player settings could not be loaded. Disabling to preserve player.yml.", exception);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         translationManager = new TranslationManager();
         hudController = new HudController();
 
@@ -52,6 +60,7 @@ public final class SlimeHUD extends JavaPlugin {
         WAILAManager.shutdown();
         if (playerData != null) {
             playerData.save();
+            playerData = null;
         }
         instance = null;
     }
