@@ -1,91 +1,65 @@
 package io.github.schntgaispock.slimehud.waila;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
-import org.bukkit.Material;
-import org.bukkit.block.Block;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.inventory.ItemStack;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
 /**
- * Regression coverage for the contributor's #15 correction.
- * Block#isPreferredTool alone is not a family check on easily broken blocks.
+ * Tests the exact policy called by VanillaInfoProvider without loading Bukkit's
+ * registry-based Material/Tag classes into a serverless Surefire JVM.
+ * Real Paper/Purpur/Leaf/Folia server boot coverage is a separate CI gate.
  */
 class VanillaInfoProviderToolHintTest {
 
-    private final YamlConfiguration enabled = new YamlConfiguration();
-
     @Test
-    void aStickCannotBeReportedAsTheHeldShovelForDirt() {
-        Block dirt = preferred(Material.DIRT, true);
-        assertEquals("Tool: Shovel (held ✗)",
-                VanillaInfoProvider.getToolInfo(dirt, new ItemStack(Material.STICK), enabled));
+    void dirtWithStickDoesNotClaimHeldShovelEvenIfDirtDoesNotNeedATool() {
+        AtomicInteger preferredCalls = new AtomicInteger();
+        assertFalse(HeldToolHintPolicy.allowed("shovel", family -> false, () -> {
+            preferredCalls.incrementAndGet();
+            return true;
+        }));
+        assertEquals(0, preferredCalls.get(), "Wrong family must short-circuit Bukkit preferred-tool check");
     }
 
     @Test
-    void aMatchingShovelIsAcceptedOnDirtWithoutToolRequirements() {
-        Block dirt = preferred(Material.DIRT, true);
-        assertEquals("Tool: Shovel (held ✓)",
-                VanillaInfoProvider.getToolInfo(dirt, new ItemStack(Material.IRON_SHOVEL), enabled));
+    void dirtWithActualShovelIsAccepted() {
+        assertTrue(HeldToolHintPolicy.allowed("shovel", family -> family.equals("shovel"), () -> true));
     }
 
     @Test
-    void theWrongToolFamilyIsRejectedEvenIfTheBlockAcceptsTheItem() {
-        Block stone = preferred(Material.STONE, true);
-        assertEquals("Tool: Pickaxe (held ✗)",
-                VanillaInfoProvider.getToolInfo(stone, new ItemStack(Material.IRON_AXE), enabled));
+    void stoneWithAnAxeIsRejectedEvenWhenPreferredToolWouldReturnTrue() {
+        assertFalse(HeldToolHintPolicy.allowed("pickaxe", family -> false, () -> true));
     }
 
     @Test
-    void miningTierStillMattersAfterTheToolFamilyMatches() {
-        Block obsidian = mock(Block.class);
-        when(obsidian.getType()).thenReturn(Material.OBSIDIAN);
-        when(obsidian.isPreferredTool(any(ItemStack.class))).thenAnswer(call ->
-                ((ItemStack) call.getArgument(0)).getType() == Material.DIAMOND_PICKAXE);
-
-        assertEquals("Tool: Pickaxe (Diamond+) (held ✗)",
-                VanillaInfoProvider.getToolInfo(obsidian, new ItemStack(Material.IRON_PICKAXE), enabled));
-        assertEquals("Tool: Pickaxe (Diamond+) (held ✓)",
-                VanillaInfoProvider.getToolInfo(obsidian, new ItemStack(Material.DIAMOND_PICKAXE), enabled));
+    void rightFamilyCannotOverrideRequiredMiningTier() {
+        assertFalse(HeldToolHintPolicy.allowed("pickaxe", family -> true, () -> false),
+                "The Bukkit preferred-tool tier check must still be required");
+        assertTrue(HeldToolHintPolicy.allowed("pickaxe", family -> true, () -> true));
     }
 
     @Test
-    void spawnersStillRequireTheExactSlimefunContainmentItem() {
-        Block spawner = preferred(Material.SPAWNER, true);
-        ItemStack plain = new ItemStack(Material.DIAMOND_PICKAXE);
-        ItemStack special = new ItemStack(Material.NETHERITE_PICKAXE);
-        SlimefunItem specialItem = mock(SlimefunItem.class);
-        when(specialItem.getId()).thenReturn("PICKAXE_OF_CONTAINMENT");
-        try (MockedStatic<SlimefunItem> lookup = mockStatic(SlimefunItem.class)) {
-            lookup.when(() -> SlimefunItem.getByItem(special)).thenReturn(specialItem);
-            assertEquals("Tool: Pickaxe of Containment (held ✗)",
-                    VanillaInfoProvider.getToolInfo(spawner, plain, enabled));
-            assertEquals("Tool: Pickaxe of Containment (held ✓)",
-                    VanillaInfoProvider.getToolInfo(spawner, special, enabled));
+    void containmentItemMustHaveExactCanonicalSlimefunId() {
+        assertTrue(HeldToolHintPolicy.isContainmentTool("PICKAXE_OF_CONTAINMENT"));
+        assertFalse(HeldToolHintPolicy.isContainmentTool("PICKAXE"));
+        assertFalse(HeldToolHintPolicy.isContainmentTool(null));
+        assertFalse(HeldToolHintPolicy.isContainmentTool("REPAIRED_SPAWNER"));
+    }
+
+    @Test
+    void allFourToolFamiliesUseTheirOwnTagKeyAndUnknownHintsPreserveFallback() {
+        for (String family : new String[] {"pickaxe", "axe", "shovel", "hoe"}) {
+            assertTrue(HeldToolHintPolicy.allowed(family, candidate -> candidate.equals(family), () -> true));
+            assertFalse(HeldToolHintPolicy.allowed(family, candidate -> !candidate.equals(family), () -> true));
         }
-    }
-
-    @Test
-    void disabledAndEmptyHandSettingsKeepTheirOriginalDisplay() {
-        Block dirt = preferred(Material.DIRT, true);
-        assertEquals("Tool: Shovel", VanillaInfoProvider.getToolInfo(dirt, null, enabled));
-        assertEquals("Tool: Shovel",
-                VanillaInfoProvider.getToolInfo(dirt, new ItemStack(Material.AIR), enabled));
-        enabled.set("vanilla.show-tool", false);
-        assertEquals("", VanillaInfoProvider.getToolInfo(dirt, new ItemStack(Material.STICK), enabled));
-    }
-
-    private static Block preferred(Material type, boolean acceptsAnyItem) {
-        Block block = mock(Block.class);
-        when(block.getType()).thenReturn(type);
-        when(block.isPreferredTool(any(ItemStack.class))).thenReturn(acceptsAnyItem);
-        return block;
+        AtomicInteger familyChecks = new AtomicInteger();
+        assertTrue(HeldToolHintPolicy.allowed("other", candidate -> {
+            familyChecks.incrementAndGet();
+            return false;
+        }, () -> true));
+        assertEquals(0, familyChecks.get(), "Legacy unknown hint fallback must not query item tags");
     }
 }
