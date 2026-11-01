@@ -29,8 +29,6 @@ import org.bukkit.potion.PotionEffect;
 
 public final class VanillaInfoProvider {
 
-    private static final String PICKAXE_OF_CONTAINMENT_ID = "PICKAXE_OF_CONTAINMENT";
-
     private VanillaInfoProvider() {}
 
     private record ToolHint(String key, String label) {}
@@ -81,7 +79,7 @@ public final class VanillaInfoProvider {
 
         String tool = hint.label();
         if (heldItem != null && !heldItem.getType().isAir()) {
-            tool += isCorrectHeldTool(block, heldItem) ? " (held ✓)" : " (held ✗)";
+            tool += isCorrectHeldTool(block, heldItem, hint) ? " (held ✓)" : " (held ✗)";
         }
         return "Tool: " + tool;
     }
@@ -229,12 +227,24 @@ public final class VanillaInfoProvider {
         return new ToolHint(key, label);
     }
 
-    private static boolean isCorrectHeldTool(Block block, ItemStack heldItem) {
+    private static boolean isCorrectHeldTool(Block block, ItemStack heldItem, ToolHint hint) {
         if (block.getType() == Material.SPAWNER) {
             SlimefunItem slimefunItem = SlimefunItem.getByItem(heldItem);
-            return slimefunItem != null && PICKAXE_OF_CONTAINMENT_ID.equals(slimefunItem.getId());
+            return slimefunItem != null && HeldToolHintPolicy.isContainmentTool(slimefunItem.getId());
         }
-        return block.isPreferredTool(heldItem);
+        // Tag access needs a live Bukkit registry. Keep that at the runtime
+        // boundary and test the pure short-circuit policy independently.
+        Material held = heldItem.getType();
+        return HeldToolHintPolicy.allowed(
+                hint.key(),
+                family -> switch (family) {
+                    case "pickaxe" -> Tag.ITEMS_PICKAXES.isTagged(held);
+                    case "axe" -> Tag.ITEMS_AXES.isTagged(held);
+                    case "shovel" -> Tag.ITEMS_SHOVELS.isTagged(held);
+                    case "hoe" -> Tag.ITEMS_HOES.isTagged(held);
+                    default -> true;
+                },
+                () -> block.isPreferredTool(heldItem));
     }
 
     private static String humanize(String value) {
