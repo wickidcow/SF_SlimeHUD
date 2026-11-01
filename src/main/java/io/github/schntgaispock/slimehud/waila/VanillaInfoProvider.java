@@ -29,8 +29,6 @@ import org.bukkit.potion.PotionEffect;
 
 public final class VanillaInfoProvider {
 
-    private static final String PICKAXE_OF_CONTAINMENT_ID = "PICKAXE_OF_CONTAINMENT";
-
     private VanillaInfoProvider() {}
 
     private record ToolHint(String key, String label) {}
@@ -232,19 +230,21 @@ public final class VanillaInfoProvider {
     private static boolean isCorrectHeldTool(Block block, ItemStack heldItem, ToolHint hint) {
         if (block.getType() == Material.SPAWNER) {
             SlimefunItem slimefunItem = SlimefunItem.getByItem(heldItem);
-            return slimefunItem != null && PICKAXE_OF_CONTAINMENT_ID.equals(slimefunItem.getId());
+            return slimefunItem != null && HeldToolHintPolicy.isContainmentTool(slimefunItem.getId());
         }
-        // Block#isPreferredTool is true for ANY item on blocks that need no tool (grass, dirt...),
-        // so also require the held item to belong to the tool family the hint names.
+        // Tag access needs a live Bukkit registry. Keep that at the runtime
+        // boundary and test the pure short-circuit policy independently.
         Material held = heldItem.getType();
-        boolean family = switch (hint.key()) {
-            case "pickaxe" -> Tag.ITEMS_PICKAXES.isTagged(held);
-            case "axe" -> Tag.ITEMS_AXES.isTagged(held);
-            case "shovel" -> Tag.ITEMS_SHOVELS.isTagged(held);
-            case "hoe" -> Tag.ITEMS_HOES.isTagged(held);
-            default -> true;
-        };
-        return family && block.isPreferredTool(heldItem);
+        return HeldToolHintPolicy.allowed(
+                hint.key(),
+                family -> switch (family) {
+                    case "pickaxe" -> Tag.ITEMS_PICKAXES.isTagged(held);
+                    case "axe" -> Tag.ITEMS_AXES.isTagged(held);
+                    case "shovel" -> Tag.ITEMS_SHOVELS.isTagged(held);
+                    case "hoe" -> Tag.ITEMS_HOES.isTagged(held);
+                    default -> true;
+                },
+                () -> block.isPreferredTool(heldItem));
     }
 
     private static String humanize(String value) {
