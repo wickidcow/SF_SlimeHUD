@@ -190,12 +190,13 @@ start_server() {
     rm -f "$INPUT_FIFO"
     mkfifo "$INPUT_FIFO"
     exec 3<>"$INPUT_FIFO"
-    
+
     (
         cd "$WORK_DIR"
         java -Xms512M -Xmx2G -jar server.jar --nogui <&3 > server.console.log 2>&1
     ) &
     SERVER_PID=$!
+}
 
 stop_server() {
     if kill -0 "$SERVER_PID" >/dev/null 2>&1; then
