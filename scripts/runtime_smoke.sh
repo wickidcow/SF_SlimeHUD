@@ -109,13 +109,19 @@ resolve_purpur_server() {
 }
 
 resolve_leaf_server() {
-    local response
-    response="$(curl --fail-with-body -sS -H "User-Agent: ${USER_AGENT}" \
-        "https://api.leafmc.one/v2/projects/leaf/versions/${MC_VERSION}")"
-    SERVER_BUILD="$(jq -r '.builds[-1] // empty' <<<"$response")"
-    SERVER_CHANNEL="LEAF"
-    if [[ -n "$SERVER_BUILD" && "$SERVER_BUILD" != "null" ]]; then
-        SERVER_URL="https://api.leafmc.one/v2/projects/leaf/versions/${MC_VERSION}/builds/${SERVER_BUILD}/downloads/leaf-${MC_VERSION}-${SERVER_BUILD}.jar"
+    local response build
+    response="$(curl --fail-with-body -sS --retry 3 --retry-all-errors --connect-timeout 15 -H "User-Agent: ${USER_AGENT}" \
+        "https://dl.leafmc.one/v3/projects/leaf/versions/${MC_VERSION}/builds")"
+    build="$(jq -ce 'if type == "array" and length > 0 then max_by(.id) else error("No Leaf builds returned by v3") end' <<<"$response")"
+    SERVER_BUILD="$(jq -r '.id // empty' <<<"$build")"
+    SERVER_CHANNEL="$(jq -r '.channel // empty' <<<"$build")"
+    SERVER_URL="$(jq -r '.downloads."server:default".url // empty' <<<"$build")"
+    SERVER_SHA256="$(jq -r '.downloads."server:default".checksums.sha256 // empty' <<<"$build")"
+    if [[ ! "$SERVER_BUILD" =~ ^[0-9]+$ || ! "$SERVER_CHANNEL" =~ ^(ALPHA|BETA|STABLE|RECOMMENDED)$
+          || "$SERVER_URL" != "https://dl-data.leafmc.one/leaf/${MC_VERSION}/${SERVER_BUILD}/leaf-${MC_VERSION}-${SERVER_BUILD}.jar"
+          || ! "$SERVER_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+        echo "Invalid exact-version Leaf v3 metadata for Minecraft ${MC_VERSION}." >&2
+        return 1
     fi
 }
 
@@ -132,6 +138,12 @@ fi
 
 curl --fail-with-body -L -sS -H "User-Agent: ${USER_AGENT}" -o "$WORK_DIR/server.jar" "$SERVER_URL"
 test -s "$WORK_DIR/server.jar"
+if [[ "$FAMILY" == "leaf" ]]; then
+    printf '%s  %s\n' "$SERVER_SHA256" "$WORK_DIR/server.jar" | sha256sum --check --status || {
+        echo "Leaf server SHA-256 mismatch." >&2
+        exit 1
+    }
+fi
 
 if [[ "$MC_VERSION" == '26.3' && "$FAMILY" != 'leaf' ]]; then
     # These expectations come from the resolver and pinned release before any native boot.
