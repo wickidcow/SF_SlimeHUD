@@ -186,14 +186,16 @@ EOF_BUILD
 
 INPUT_FIFO="$WORK_DIR/server.stdin"
 CONSOLE_LOG="$WORK_DIR/server.console.log"
-mkfifo "$INPUT_FIFO"
-exec 3<>"$INPUT_FIFO"
-
-(
-    cd "$WORK_DIR"
-    java -Xms512M -Xmx2G -jar server.jar --nogui <&3 > server.console.log 2>&1
-) &
-SERVER_PID=$!
+start_server() {
+    rm -f "$INPUT_FIFO"
+    mkfifo "$INPUT_FIFO"
+    exec 3<>"$INPUT_FIFO"
+    
+    (
+        cd "$WORK_DIR"
+        java -Xms512M -Xmx2G -jar server.jar --nogui <&3 > server.console.log 2>&1
+    ) &
+    SERVER_PID=$!
 
 stop_server() {
     if kill -0 "$SERVER_PID" >/dev/null 2>&1; then
@@ -210,18 +212,40 @@ stop_server() {
     fi
 }
 
-STARTED=false
-STARTUP_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
-while kill -0 "$SERVER_PID" >/dev/null 2>&1 && (( SECONDS < STARTUP_DEADLINE )); do
-    if grep -Fq 'Done (' "$CONSOLE_LOG" 2>/dev/null; then
-        STARTED=true
+LEAF_BOOTSTRAP_CONSUMED=false
+while true; do
+    start_server
+    STARTED=false
+    STARTUP_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
+    while kill -0 "$SERVER_PID" >/dev/null 2>&1 && (( SECONDS < STARTUP_DEADLINE )); do
+        if grep -Fq 'Done (' "$CONSOLE_LOG" 2>/dev/null; then
+            STARTED=true
+            break
+        fi
+        if grep -Fq 'Error occurred while enabling SlimeHUD' "$CONSOLE_LOG" 2>/dev/null || \
+           grep -Fq 'Error occurred while enabling Slimefun' "$CONSOLE_LOG" 2>/dev/null; then
+            break
+        fi
+        sleep 2
+    done
+    if [[ "$STARTED" == true ]]; then
         break
     fi
-    if grep -Fq 'Error occurred while enabling SlimeHUD' "$CONSOLE_LOG" 2>/dev/null || \
-       grep -Fq 'Error occurred while enabling Slimefun' "$CONSOLE_LOG" 2>/dev/null; then
-        break
+    # Allow exactly one configuration-only first boot, not arbitrary startup failures.
+    if [[ "$FAMILY" == "leaf" && "$LEAF_BOOTSTRAP_CONSUMED" == false
+          && -s "$WORK_DIR/config/leaf-loader.yml" ]] \
+          && grep -Fq 'leaf-loader.yml with the default settings.' "$CONSOLE_LOG" \
+          && grep -Fq 'Check it first, then start the server again.' "$CONSOLE_LOG" \
+          && ! grep -Eq 'Exception|NoClassDefFoundError|Error occurred while enabling|Could not load|Enabling Slimefun|Enabling SlimeHUD|Done \(' "$CONSOLE_LOG"; then
+        LEAF_BOOTSTRAP_CONSUMED=true
+        stop_server
+        wait "$SERVER_PID" >/dev/null 2>&1 || true
+        exec 3>&-
+        mv "$CONSOLE_LOG" "$WORK_DIR/leaf-loader.bootstrap.console.log"
+        echo "Leaf generated its loader config; starting the full smoke test now."
+        continue
     fi
-    sleep 2
+    break
 done
 
 if [[ "$STARTED" != true ]]; then
